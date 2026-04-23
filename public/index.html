@@ -1,0 +1,499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Devnix — Build Your Discipline</title>
+<meta name="description" content="Devnix · Track habits. Build wealth. Stay consistent."/>
+
+<!-- api-base: leave empty for dev auto-detect, fill for production -->
+<meta name="api-base" content="https://devnix-backend.onrender.com">
+
+
+<!-- ── Production: set this to your deployed API URL ─────────
+     e.g. <meta name="api-base" content="https://api.devnix.app">
+     Leave empty in development — api.js auto-detects port 3001. -->
+<!-- api-base: leave empty for dev auto-detect, fill for production
+     e.g. <meta name="api-base" content="https://devnix-backend.onrender.com"> -->
+
+<link rel="stylesheet" href="css/style.css"/>
+<style>
+/* Backend-down banner */
+#backendBanner{display:none;position:fixed;top:0;left:0;right:0;z-index:9999;background:#b91c1c;color:#fff;font-size:12px;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;padding:10px 20px;text-align:center;gap:10px;align-items:center;justify-content:center;flex-wrap:wrap}
+#backendBanner.show{display:flex}
+#backendBanner code{background:rgba(255,255,255,.2);padding:2px 7px;border-radius:4px;font-family:monospace}
+#backendBanner a{color:#fca5a5;text-decoration:underline;cursor:pointer}
+</style>
+</head>
+<body>
+<div id="root" style="position:relative;min-height:400px">
+<div class="splash" id="splash">
+  <div class="splash-logo"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h6c3.9 0 7 3.1 7 7v2c0 3.9-3.1 7-7 7H5z" fill="none" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><line x1="9.5" y1="4" x2="14.5" y2="20" stroke="white" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/></svg></div>
+  <div class="splash-spinner"></div>
+  <div class="splash-txt">Loading your workspace…</div>
+</div>
+<div id="authView" class="auth-wrap H">
+  <div class="auth-card">
+    <div class="auth-brand">
+      <div class="auth-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h6c3.9 0 7 3.1 7 7v2c0 3.9-3.1 7-7 7H5z" fill="none" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><line x1="9.5" y1="4" x2="14.5" y2="20" stroke="white" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/></svg></div>
+      <span class="auth-name">Devnix</span>
+    </div>
+    <div class="auth-sub">Build your discipline. Track habits. Grow wealth.</div>
+    <div id="authErr" class="auth-err H"></div>
+    <div class="f-grp"><label class="f-label">Email</label><input class="f-input" id="aEm" type="email" placeholder="you@example.com" autocomplete="email"/></div>
+    <div class="f-grp"><label class="f-label">Password</label><input class="f-input" id="aPw" type="password" placeholder="••••••••" autocomplete="current-password"/></div>
+    <label class="rem-chk"><input type="checkbox" id="aRem"/> Stay signed in</label>
+    <button class="btn-auth" id="aBtn">Sign in</button>
+    <div class="auth-sw">Don't have an account? <span id="aToggle">Create one free</span></div>
+  </div>
+</div>
+<div id="appShell" class="H">
+  <nav class="navbar">
+    <div class="nb-logo">
+      <div class="nb-icon"><svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M5 4h6c3.9 0 7 3.1 7 7v2c0 3.9-3.1 7-7 7H5z" fill="none" stroke="white" stroke-width="1.8" stroke-linejoin="round"/><line x1="9.5" y1="4" x2="14.5" y2="20" stroke="white" stroke-width="1.4" stroke-linecap="round" opacity="0.6"/></svg></div>
+      <span class="nb-name">Devnix</span>
+    </div>
+    <div class="nb-nav">
+      <button class="nb-btn on" data-pg="dashboard">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Dashboard
+      </button>
+      <button class="nb-btn" data-pg="finance">
+        <svg viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+        Finance
+      </button>
+      <button class="nb-btn" data-pg="journal">
+        <svg viewBox="0 0 24 24"><path d="M18 2H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 18H6V4h2v8l2.5-1.5L13 12V4h5v16z"/></svg>
+        Journal
+      </button>
+      <button class="nb-btn" data-pg="profile">
+        <svg viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+        Profile
+      </button>
+    </div>
+    <div class="nb-sep"></div>
+    <div class="nb-r">
+      <div class="sync-wrap"><div class="sync-dot" id="syncDot"></div><span id="syncTxt">Saved</span></div>
+      <button class="nb-icon-btn" id="darkBtn" title="Toggle dark mode">&#9790;</button>
+      <div class="nb-avatar" id="nbAv">?</div>
+      <button class="btn-logout" id="logoutBtn">Sign out</button>
+    </div>
+  </nav>
+  <div id="pgDashboard" class="page">
+    <div class="section-divider">
+      <div class="section-divider-line"></div>
+      <span class="section-divider-label">Tracker</span>
+      <div class="section-divider-line"></div>
+    </div>
+    <div class="toolbar">
+      <input class="t-input" id="nTask" placeholder="Task name…" style="width:155px" maxlength="50"/>
+      <select class="t-sel" id="nCat">
+        <option value="health">Health</option>
+        <option value="work">Work</option>
+        <option value="study">Study</option>
+        <option value="other">Other</option>
+      </select>
+      <button class="t-btn g" id="addBtn">+ Add task</button>
+      <button class="t-btn o" id="exportBtn">Export CSV</button>
+      <button class="t-btn o" id="reminderBtn">Reminder</button>
+      <div class="wk-ctrl">
+        <button class="wk-btn" id="prevW">&#8249;</button>
+        <span class="wk-lbl" id="wkLbl"></span>
+        <button class="wk-btn" id="nextW">&#8250;</button>
+      </div>
+    </div>
+    <div class="goal-strip">
+      <span class="g-lbl">Today's goal</span>
+      <div class="g-track"><div class="g-fill" id="gFill" style="width:0%"></div></div>
+      <span class="g-pct" id="gPct">0%</span>
+      <span class="g-badge g-low" id="gBadge">Start now</span>
+      <span style="font-size:11px;color:var(--tx3);margin-left:2px">/ 80% target</span>
+    </div>
+    <div style="position:relative">
+      <div class="grid-shell">
+        <table id="grid"><thead id="gHead"></thead><tbody id="gBody"></tbody></table>
+      </div>
+      <div id="noteModal" class="modal-bg H" style="position:absolute;top:0;left:0;right:0;bottom:0;min-height:200px">
+        <div class="modal">
+          <h3 id="noteTitle">Add note</h3>
+          <textarea id="noteTA" placeholder="Write a note for this day…"></textarea>
+          <div class="modal-btns">
+            <button class="m-btn cl" id="noteCancel">Cancel</button>
+            <button class="m-btn sv" id="noteSave">Save note</button>
+          </div>
+        </div>
+      </div>
+      <!-- Edit Transaction Modal -->
+      <div class="modal-bg H" id="editTxModal" style="position:fixed;top:0;left:0;right:0;bottom:0;z-index:300">
+        <div class="edit-modal">
+          <h3>&#9999; Edit Transaction</h3>
+          <div class="edit-grp"><label class="edit-label">Description</label><input class="edit-input" id="etDesc" placeholder="Description"/></div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="edit-grp"><label class="edit-label">Amount</label><input class="edit-input" id="etAmt" type="number" step="0.01" min="0" placeholder="0.00"/></div>
+            <div class="edit-grp"><label class="edit-label">Type</label>
+              <select class="edit-sel" id="etType">
+                <option value="expense">Expense</option>
+                <option value="income">Income</option>
+              </select>
+            </div>
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+            <div class="edit-grp"><label class="edit-label">Category</label>
+              <select class="edit-sel" id="etCat">
+                <option value="Food">Food</option>
+                <option value="Transport">Transport</option>
+                <option value="Housing">Housing</option>
+                <option value="Health">Health</option>
+                <option value="Shopping">Shopping</option>
+                <option value="Entertainment">Entertainment</option>
+                <option value="Income">Income</option>
+              </select>
+            </div>
+            <div class="edit-grp"><label class="edit-label">Date</label><input class="edit-input" id="etDate" type="date"/></div>
+          </div>
+          <div class="edit-grp"><label class="edit-label">Status</label>
+            <select class="edit-sel" id="etStatus">
+              <option value="cleared">Cleared</option>
+              <option value="pending">Pending</option>
+            </select>
+          </div>
+          <div class="modal-btns">
+            <button class="m-btn cl" id="etCancel">Cancel</button>
+            <button class="m-btn sv" id="etSave">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div id="reminderBanner" class="rem-banner H">
+      <span id="remMsg"></span>
+      <button onclick="document.getElementById('reminderBanner').classList.add('H')" style="background:none;border:none;cursor:pointer;font-size:18px;color:var(--amb);line-height:1">×</button>
+    </div>
+    <div class="section-divider" style="margin-top:8px">
+      <div class="section-divider-line"></div>
+      <span class="section-divider-label">Analytics</span>
+      <div class="section-divider-line"></div>
+    </div>
+    <div class="stats-row" id="statsRow">
+      <div class="skel skel-stat"></div>
+      <div class="skel skel-stat"></div>
+      <div class="skel skel-stat"></div>
+      <div class="skel skel-stat"></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-head">
+        <span class="cc-title">Daily completion %</span>
+        <div class="pills">
+          <div class="pill on" data-d="14">14d</div>
+          <div class="pill" data-d="30">30d</div>
+          <div class="pill" data-d="90">90d</div>
+        </div>
+      </div>
+      <div id="barSkel" class="skel skel-bar"></div>
+      <div id="barWrap" class="ch-wrap H" style="height:200px"><canvas id="barCh"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-head"><span class="cc-title">7-day moving average trend</span></div>
+      <div id="lineSkel" class="skel skel-line"></div>
+      <div id="lineWrap" class="ch-wrap H" style="height:180px"><canvas id="lineCh"></canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="cc-head"><span class="cc-title">Contribution heatmap — 90 days</span></div>
+      <div id="hmSkel" class="skel skel-hm"></div>
+      <div id="hmGrid" class="hm-grid H"></div>
+      <div class="hm-legend">
+        <div class="hm-sq hm0"></div>0%
+        <div class="hm-sq hm1" style="margin-left:6px"></div>1–49%
+        <div class="hm-sq hm2" style="margin-left:4px"></div>50–99%
+        <div class="hm-sq hm3" style="margin-left:4px"></div>100%
+      </div>
+    </div>
+    <div class="ins-grid" id="insGrid">
+      <div class="skel skel-insight"></div>
+      <div class="skel skel-insight"></div>
+      <div class="skel skel-insight"></div>
+      <div class="skel skel-insight"></div>
+    </div>
+  </div>
+  <div id="pgFinance" class="H">
+    <div class="fin-subtabs">
+      <div class="fin-tab on" data-ft="overview">
+        <svg viewBox="0 0 24 24"><path d="M3 13h8V3H3v10zm0 8h8v-6H3v6zm10 0h8V11h-8v10zm0-18v6h8V3h-8z"/></svg>
+        Overview
+      </div>
+      <div class="fin-tab" data-ft="analytics">
+        <svg viewBox="0 0 24 24"><path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/></svg>
+        Analytics
+      </div>
+      <div class="fin-tab" data-ft="transactions">
+        <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
+        Transactions
+      </div>
+      <div class="fin-tab" data-ft="review">
+        <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+        Weekly Review
+      </div>
+    </div>
+    <div class="fin-alert-bar" id="finAlertBar">
+      <svg viewBox="0 0 24 24"><path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/></svg>
+      <span id="finAlertTxt"><strong>3 alerts:</strong> Housing expense 22% above budget · Savings goal "Vacation" at risk · Unusual spending detected</span>
+      <button class="fin-alert-close" onclick="document.getElementById('finAlertBar').classList.add('H')">×</button>
+    </div>
+    <div id="ftOverview" class="page">
+      <div class="kpi-row" id="kpiRow"></div>
+      <div class="chart-row2">
+        <div class="fin-card">
+          <div class="card-head2">
+            <div><div class="card-title2">Income vs Expenses</div><div class="card-sub2">Monthly comparison</div></div>
+            <div class="legend2">
+              <span class="leg-item"><span class="leg-sq" style="background:#3b82f6"></span>Income</span>
+              <span class="leg-item"><span class="leg-sq" style="border:2px dashed #ef4444;background:transparent"></span>Expenses</span>
+            </div>
+          </div>
+          <div class="ch" style="height:200px"><canvas id="revExpCh"></canvas></div>
+        </div>
+        <div class="fin-card">
+          <div class="card-head2"><div><div class="card-title2">Spending by category</div><div class="card-sub2">This month</div></div></div>
+          <div class="ch" style="height:180px"><canvas id="catDonutCh"></canvas></div>
+        </div>
+      </div>
+      <div class="ins-row2" id="overviewInsights"></div>
+    </div>
+    <div id="ftAnalytics" class="page H">
+      <!-- Live data notice -->
+      <div style="display:flex;align-items:center;gap:8px;padding:8px 14px;background:var(--blubg);border:1px solid var(--blumid);border-radius:10px;font-size:11px;color:var(--blumid)">
+        <span style="width:8px;height:8px;border-radius:50%;background:var(--blumid);display:inline-block;animation:pulse 1.5s infinite"></span>
+        <strong>Live analytics</strong> — all charts update instantly as you add or edit transactions
+      </div>
+      <div class="analytics-row2">
+        <div class="fin-card">
+          <div class="card-head2">
+            <div><div class="card-title2">Net worth trend</div><div class="card-sub2" id="nwSub">Based on your transactions</div></div>
+          </div>
+          <div class="ch" style="height:200px"><canvas id="netWorthCh"></canvas></div>
+        </div>
+        <div class="fin-card">
+          <div class="card-head2">
+            <div><div class="card-title2">Expense distribution</div><div class="card-sub2">Live from your transactions · click to set budget</div></div>
+            <button class="sel-btn" id="addCatBudgetBtn" style="height:28px;padding:0 10px;font-size:11px;background:var(--sf2);color:var(--tx2);border:1px solid var(--bd);border-radius:7px;cursor:pointer;font-family:inherit">+ Add budget</button>
+          </div>
+          <div id="catList2" class="cat-list2"></div>
+        </div>
+      </div>
+      <div class="analytics-row2">
+        <div class="fin-card">
+          <div class="card-head2"><div><div class="card-title2">Cash flow</div><div class="card-sub2">Monthly income minus expenses (live)</div></div></div>
+          <div class="ch" style="height:180px"><canvas id="cashFlowCh"></canvas></div>
+        </div>
+        <div class="fin-card">
+          <div class="card-head2">
+            <div><div class="card-title2">Savings goals</div><div class="card-sub2">Track your targets</div></div>
+            <button class="sel-btn" id="addGoalBtn" style="height:28px;padding:0 10px;font-size:11px;background:var(--blumid);color:#fff;border:none;border-radius:7px;cursor:pointer;font-family:inherit">+ Add goal</button>
+          </div>
+          <div class="savings-list" id="savingsList2"></div>
+        </div>
+      </div>
+      <div class="fin-card">
+        <div class="card-head2"><div><div class="card-title2">6-month forecast</div><div class="card-sub2" id="forecastSub">Projected from your current savings rate</div></div></div>
+        <div class="ch" style="height:180px"><canvas id="forecastCh"></canvas></div>
+      </div>
+    </div>
+    <!-- Budget edit modal -->
+    <div class="modal-bg H" id="budgetModal" style="position:fixed;inset:0;z-index:300">
+      <div class="edit-modal" style="width:340px">
+        <h3>&#128184; Set Category Budget</h3>
+        <div class="edit-grp"><label class="edit-label">Category</label>
+          <select class="edit-sel" id="bmCat">
+            <option value="Food">Food</option><option value="Transport">Transport</option>
+            <option value="Housing">Housing</option><option value="Health">Health</option>
+            <option value="Shopping">Shopping</option><option value="Entertainment">Entertainment</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+        <div class="edit-grp"><label class="edit-label">Monthly budget ($)</label><input class="edit-input" id="bmAmt" type="number" min="0" placeholder="e.g. 500"/></div>
+        <div class="modal-btns"><button class="m-btn cl" id="bmCancel">Cancel</button><button class="m-btn sv" id="bmSave">Save budget</button></div>
+      </div>
+    </div>
+    <!-- Savings goal modal -->
+    <div class="modal-bg H" id="goalModal" style="position:fixed;inset:0;z-index:300">
+      <div class="edit-modal" style="width:360px">
+        <h3 id="goalModalTitle">&#127945; Savings Goal</h3>
+        <div class="edit-grp"><label class="edit-label">Goal name</label><input class="edit-input" id="gmName" placeholder="e.g. Japan trip"/></div>
+        <div class="edit-grp"><label class="edit-label">Emoji icon</label><input class="edit-input" id="gmEmoji" placeholder="✈" maxlength="4" style="font-size:18px"/></div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+          <div class="edit-grp"><label class="edit-label">Target ($)</label><input class="edit-input" id="gmTarget" type="number" min="1" placeholder="5000"/></div>
+          <div class="edit-grp"><label class="edit-label">Saved so far ($)</label><input class="edit-input" id="gmSaved" type="number" min="0" placeholder="0"/></div>
+        </div>
+        <div class="edit-grp"><label class="edit-label">Color</label>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px" id="gmColorPicker">
+            <span data-c="#3b82f6" style="width:22px;height:22px;border-radius:50%;background:#3b82f6;cursor:pointer;border:2px solid transparent" title="Blue"></span>
+            <span data-c="#22c55e" style="width:22px;height:22px;border-radius:50%;background:#22c55e;cursor:pointer;border:2px solid transparent" title="Green"></span>
+            <span data-c="#f59e0b" style="width:22px;height:22px;border-radius:50%;background:#f59e0b;cursor:pointer;border:2px solid transparent" title="Amber"></span>
+            <span data-c="#8b5cf6" style="width:22px;height:22px;border-radius:50%;background:#8b5cf6;cursor:pointer;border:2px solid transparent" title="Purple"></span>
+            <span data-c="#ec4899" style="width:22px;height:22px;border-radius:50%;background:#ec4899;cursor:pointer;border:2px solid transparent" title="Pink"></span>
+            <span data-c="#14b8a6" style="width:22px;height:22px;border-radius:50%;background:#14b8a6;cursor:pointer;border:2px solid transparent" title="Teal"></span>
+            <span data-c="#f87171" style="width:22px;height:22px;border-radius:50%;background:#f87171;cursor:pointer;border:2px solid transparent" title="Red"></span>
+            <span data-c="#06b6d4" style="width:22px;height:22px;border-radius:50%;background:#06b6d4;cursor:pointer;border:2px solid transparent" title="Cyan"></span>
+          </div>
+          <input type="hidden" id="gmColor" value="#3b82f6"/>
+        </div>
+        <div class="modal-btns">
+          <button class="m-btn cl" id="gmCancel">Cancel</button>
+          <button class="m-btn sv" id="gmSave">Save goal</button>
+        </div>
+      </div>
+    </div>
+    <div id="ftTransactions" class="page H">
+      <!-- Selection action bar -->
+      <div id="selBar" class="sel-bar H">
+        <span class="sel-bar-txt" id="selBarTxt">0 selected</span>
+        <button class="sel-btn edit" id="selEditBtn">&#9999; Edit</button>
+        <button class="sel-btn" id="selDupBtn" style="background:var(--purmid);color:#fff">&#10064; Duplicate</button>
+        <button class="sel-btn" id="selClearedBtn" style="background:var(--grnmid);color:#fff">&#10003; Mark Cleared</button>
+        <button class="sel-btn" id="selPendingBtn" style="background:var(--ambm);color:#fff">&#9711; Mark Pending</button>
+        <button class="sel-btn del" id="selDelBtn">&#128465; Delete</button>
+        <button class="sel-btn" id="selExportBtn" style="background:var(--sf2);color:var(--tx2);border:1px solid var(--bd)">&#8681; Export</button>
+        <button class="sel-btn clear" id="selClearBtn">&#10005; Clear</button>
+      </div>
+      <div class="quick-add">
+        <div class="qa-grp" style="min-width:100px;flex:1.5">
+          <label class="qa-label">Description</label>
+          <input class="qa-input" id="qaDesc" placeholder="e.g. Grocery run"/>
+        </div>
+        <div class="qa-grp" style="min-width:80px;flex:0.8">
+          <label class="qa-label">Amount (₹/$)</label>
+          <input class="qa-input" id="qaAmt" type="number" placeholder="0.00"/>
+        </div>
+        <div class="qa-grp" style="min-width:100px">
+          <label class="qa-label">Category</label>
+          <select class="qa-sel" id="qaCat">
+            <option value="Food">Food</option>
+            <option value="Transport">Transport</option>
+            <option value="Housing">Housing</option>
+            <option value="Health">Health</option>
+            <option value="Shopping">Shopping</option>
+            <option value="Entertainment">Entertainment</option>
+            <option value="Income">Income</option>
+          </select>
+        </div>
+        <div class="qa-grp" style="min-width:90px">
+          <label class="qa-label">Type</label>
+          <select class="qa-sel" id="qaType">
+            <option value="expense">Expense</option>
+            <option value="income">Income</option>
+          </select>
+        </div>
+        <div class="qa-grp" style="min-width:110px">
+          <label class="qa-label">Date</label>
+          <input class="qa-input" id="qaDate" type="date"/>
+        </div>
+        <button class="qa-btn" id="qaAdd">+ Add entry</button>
+      </div>
+      <div class="fin-card">
+        <div class="tbl-head2">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-title2">Transaction history</div>
+            <span id="txRowCount" style="font-size:11px;color:var(--tx3);background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:2px 8px"></span>
+          </div>
+          <div class="tbl-filters">
+            <input class="f-inp2" id="txSearch" placeholder="Search…"/>
+            <select class="f-sel2" id="txCatF">
+              <option value="all">All categories</option>
+              <option value="Food">Food</option>
+              <option value="Transport">Transport</option>
+              <option value="Housing">Housing</option>
+              <option value="Health">Health</option>
+              <option value="Shopping">Shopping</option>
+              <option value="Income">Income</option>
+              <option value="Entertainment">Entertainment</option>
+            </select>
+            <select class="f-sel2" id="txTypeF">
+              <option value="all">All types</option>
+              <option value="income">Income</option>
+              <option value="expense">Expense</option>
+            </select>
+            <button class="sel-btn" id="exportAllBtn" style="height:32px;padding:0 12px;background:var(--sf2);color:var(--tx2);border:1px solid var(--bd);border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .18s" title="Export all filtered transactions">&#8681; Export CSV</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table><thead id="txHead2"></thead><tbody id="txBody2"></tbody></table></div>
+      </div>
+    </div>
+    <div id="ftReview" class="page H">
+      <div class="weekly-review">
+        <div class="wr-head">📊 Weekly Financial Review</div>
+        <div class="wr-sub" id="wrSubtitle">Summary for this week</div>
+        <div class="wr-grid" id="wrGrid"></div>
+        <div style="font-size:12px;font-weight:600;color:var(--tx);margin-bottom:10px">💡 Actionable Suggestions</div>
+        <div class="wr-suggestions" id="wrSuggestions"></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+        <div class="fin-card">
+          <div class="card-head2"><div><div class="card-title2">🔍 Spending leak detection</div><div class="card-sub2">Recurring small expenses add up</div></div></div>
+          <div id="spendingLeaks" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
+        </div>
+        <div class="fin-card">
+          <div class="card-head2"><div><div class="card-title2">🧠 Rule-based alerts</div><div class="card-sub2">Budget & behaviour monitoring</div></div></div>
+          <div id="ruleAlerts" style="display:flex;flex-direction:column;gap:8px;margin-top:4px"></div>
+        </div>
+      </div>
+      <div class="fin-card">
+        <div class="card-head2"><div><div class="card-title2">📈 Budget vs Actual</div><div class="card-sub2">Month-to-date utilisation</div></div></div>
+        <div class="cat-list2" id="budgetActual"></div>
+      </div>
+    </div>
+  </div>
+  <div id="pgJournal" class="page H"></div>
+  <div id="pgProfile" class="page H">
+    <div class="profile-card">
+      <div class="p-av" id="pAv">?</div>
+      <div class="p-name" id="pName">—</div>
+      <div class="p-email" id="pEmail">—</div>
+      <div class="p-stats" id="pStats"></div>
+      <div class="p-actions">
+        <button class="t-btn o" style="width:100%;text-align:left;padding:0 16px;display:flex;align-items:center;gap:10px" id="pExp">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--p)"></span>Export discipline data (CSV)
+        </button>
+        <button class="t-btn o" style="width:100%;text-align:left;padding:0 16px;display:flex;align-items:center;gap:10px" id="pRem">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--ambm)"></span>Send today's reminder
+        </button>
+        <button class="t-btn o" style="width:100%;text-align:left;padding:0 16px;display:flex;align-items:center;gap:10px" id="pDark">
+          <span style="width:8px;height:8px;border-radius:50%;background:var(--blu)"></span>Toggle dark mode
+        </button>
+        <button class="t-btn o" style="width:100%;text-align:left;padding:0 16px;display:flex;align-items:center;gap:10px;border-color:var(--redbg);color:var(--red)" id="pOut">
+          Sign out of this device
+        </button>
+      </div>
+    </div>
+  </div>
+  <div class="toast-wrap" id="toastWrap"></div>
+</div>
+</div>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="js/api.js"></script>
+<script src="js/app.js"></script>
+
+<!-- Backend connectivity banner — shown if /api/health fails -->
+<div id="backendBanner">
+  ⚠️ Cannot reach the Devnix backend at <code id="bbUrl"></code>.
+  Make sure you ran <code>npm run dev</code> inside the <code>backend/</code> folder.
+  &nbsp;<a onclick="document.getElementById('backendBanner').classList.remove('show')">Dismiss</a>
+</div>
+<script>
+// Ping /api/health once on load to give an immediate warning if the
+// backend isn't running, instead of a confusing "Failed to fetch" on login.
+(async function pingBackend() {
+  const url = window._DEVNIX_API_BASE + '/health';
+  document.getElementById('bbUrl').textContent = window._DEVNIX_API_BASE.replace('/api','');
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(4000) });
+    if (!res.ok) throw new Error('non-2xx');
+    console.log('✅ Backend reachable at', window._DEVNIX_API_BASE);
+  } catch(e) {
+    console.warn('⚠️ Backend unreachable:', e.message);
+    document.getElementById('backendBanner').classList.add('show');
+    // Push the app down so the banner doesn't overlap the splash screen
+    document.getElementById('root').style.marginTop = '44px';
+  }
+})();
+</script>
+</body>
+</html>

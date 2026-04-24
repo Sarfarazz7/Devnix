@@ -64,7 +64,7 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .tag-chip.sel{background:var(--pl);border-color:var(--p);color:var(--p)}
 .jef-meta{padding:0 20px;margin-top:10px;flex-shrink:0}
 .jef-date-lbl{font-size:11px;color:var(--tx3);margin-bottom:6px}
-.jef-title-inp{width:100%;border:none;background:transparent;color:var(--tx);font-size:22px;font-weight:700;font-family:inherit;outline:none;letter-spacing:-.3px;padding:0;line-height:1.3}
+.jef-title-inp{width:100%;border:none;background:transparent;color:var(--tx);font-size:18px;font-weight:700;font-family:inherit;outline:none;letter-spacing:-.3px;padding:0;line-height:1.3;overflow-wrap:break-word;word-break:break-word;white-space:normal}
 .jef-title-inp::placeholder{color:var(--tx3)}
 .jef-divider{height:1px;background:var(--bd);margin:10px 20px;flex-shrink:0}
 .jef-body{flex:1;overflow-y:auto;padding:0 20px 20px}
@@ -111,102 +111,278 @@ body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',system-ui,sans-seri
 .jtab:hover{color:var(--tx);background:var(--sf)}
 .jtab.on{color:var(--p);border-color:var(--p);background:var(--sf)}
 /* Journal analytics panel */
-.jan-wrap{flex:1;overflow-y:auto;padding:18px 20px;display:flex;flex-direction:column;gap:14px}
-.jan-kpi-row{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
-.jan-kpi{background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:14px 10px;text-align:center;transition:transform .18s,box-shadow .18s;animation:fadeUp .3s var(--ease) both}
-.jan-kpi:hover{transform:translateY(-2px);box-shadow:0 4px 12px rgba(0,0,0,.09)}
-.jan-kpi-icon{font-size:20px;margin-bottom:4px}
-.jan-kpi-val{font-size:20px;font-weight:800;color:var(--tx);animation:countUp .4s var(--ease)}
-.jan-kpi-lbl{font-size:10px;color:var(--tx3);margin-top:3px;text-transform:uppercase;letter-spacing:.04em}
-.jan-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px}
-.jan-card{background:var(--sf2);border:1px solid var(--bd);border-radius:12px;padding:14px 16px;animation:fadeUp .4s var(--ease) both;transition:border-color .18s}
-.jan-card:hover{border-color:var(--bd2)}
-.jan-wide{grid-column:span 2}
-.jan-card-head{margin-bottom:12px}
-.jan-card-title{font-size:12px;font-weight:700;color:var(--tx)}
-.jan-card-sub{font-size:10px;color:var(--tx3);margin-top:2px}
-.jan-mood-list{display:flex;flex-direction:column;gap:7px}
-.jan-mood-row{display:flex;align-items:center;gap:8px}
-.jan-sent-legend{display:flex;justify-content:center;gap:10px;font-size:10px;margin-top:8px;flex-wrap:wrap;color:var(--tx3)}
-.jan-tag-bars{display:flex;flex-direction:column;gap:0}
-.jan-insights{display:flex;flex-direction:column;gap:7px}
-/* ── Journal Analytics Full Panel ─────────────────────── */
-.jan-full-panel {
-  height: 100%;
+/* ═══════════════════════════════════════════════════════════
+   JOURNAL ANALYTICS — Professional Redesign
+   ─ Compact KPI bar, animated charts, styled scrollbar,
+     single scrollbar, no dead space
+   ═══════════════════════════════════════════════════════════ */
+
+/* Scrollbar — styled, not hidden (cross-browser) */
+.jan-wrap::-webkit-scrollbar { width: 4px; }
+.jan-wrap::-webkit-scrollbar-track { background: transparent; }
+.jan-wrap::-webkit-scrollbar-thumb { background: var(--bd2, #374151); border-radius: 4px; }
+.jan-wrap::-webkit-scrollbar-thumb:hover { background: var(--p, #8b5cf6); }
+.jan-wrap { scrollbar-width: thin; scrollbar-color: var(--bd2, #374151) transparent; }
+
+/* Root wrap — single scroll, NO double scrollbar */
+.jan-wrap {
+  flex: 1;
   overflow-y: auto;
-  padding: 24px 28px;
+  overflow-x: hidden;
+  padding: 14px 16px 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 0;
   box-sizing: border-box;
 }
-.jan-header { margin-bottom: 20px; }
-.jan-header-title { font-size: 18px; font-weight: 700; color: var(--tx1); margin-bottom: 4px; }
-.jan-header-sub { font-size: 12px; color: var(--tx3); }
 
+/* ── Live badge ─────────────────────────────────────────── */
+.jan-live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 10px;
+  font-weight: 600;
+  color: #22c55e;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+}
+.jan-live-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #22c55e;
+  animation: livePulse 1.6s ease infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.4; transform: scale(0.7); }
+}
+
+/* ── Compact KPI bar ────────────────────────────────────── */
 .jan-kpi-row {
   display: grid;
   grid-template-columns: repeat(4, 1fr);
-  gap: 12px;
-  margin-bottom: 20px;
+  gap: 8px;
 }
 .jan-kpi {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 16px 12px;
+  background: var(--sf2);
+  border: 1px solid var(--bd);
+  border-radius: 10px;
+  padding: 10px 8px 8px;
   text-align: center;
-  transition: transform .2s;
+  transition: transform .18s, box-shadow .18s, border-color .18s;
+  animation: fadeUp .3s var(--ease) both;
+  position: relative;
+  overflow: hidden;
 }
-.jan-kpi:hover { transform: translateY(-2px); }
-.jan-kpi-icon { font-size: 22px; margin-bottom: 6px; }
-.jan-kpi-val { font-size: 22px; font-weight: 700; color: var(--tx1); }
-.jan-kpi-lbl { font-size: 11px; color: var(--tx3); margin-top: 3px; text-transform: uppercase; letter-spacing: .5px; }
+.jan-kpi::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(135deg, rgba(139,92,246,.04) 0%, transparent 60%);
+  pointer-events: none;
+}
+.jan-kpi:hover { transform: translateY(-2px); box-shadow: 0 4px 14px rgba(0,0,0,.12); border-color: var(--p, #8b5cf6); }
+.jan-kpi-icon { font-size: 16px; margin-bottom: 3px; line-height: 1; }
+.jan-kpi-val { font-size: 18px; font-weight: 800; color: var(--tx); line-height: 1.1; }
+.jan-kpi-lbl { font-size: 9px; color: var(--tx3); margin-top: 3px; text-transform: uppercase; letter-spacing: .05em; }
 
-.jan-grid {
+/* ── Chart cards ────────────────────────────────────────── */
+.jan-chart-card {
+  background: var(--sf2);
+  border: 1px solid var(--bd);
+  border-radius: 12px;
+  padding: 14px 16px;
+  animation: fadeUp .4s var(--ease) both;
+  transition: border-color .18s;
+}
+.jan-chart-card:hover { border-color: var(--bd2, #374151); }
+
+.jan-chart-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.jan-chart-title {
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--tx);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.jan-chart-sub {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--tx3);
+}
+
+/* Chart canvas wrapper — compact heights */
+.jan-chart-wrap {
+  position: relative;
+  height: 150px;
+}
+.jan-chart-wrap-sm {
+  position: relative;
+  height: 130px;
+}
+
+/* Empty state inside chart */
+.jan-empty {
+  height: 150px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-direction: column;
+  gap: 6px;
+  color: var(--tx3);
+  font-size: 11px;
+}
+.jan-empty-icon { font-size: 22px; opacity: .5; }
+
+/* ── 2-column grid for side-by-side cards ───────────────── */
+.jan-row2 {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 14px;
+  gap: 10px;
 }
-.jan-card {
-  background: var(--card);
-  border: 1px solid var(--border);
-  border-radius: 14px;
-  padding: 18px 20px;
-}
-.jan-card-wide { grid-column: 1 / -1; }
-.jan-card-title { font-size: 13px; font-weight: 700; color: var(--tx1); margin-bottom: 14px; }
-.jan-card-sub { font-size: 11px; font-weight: 400; color: var(--tx3); margin-left: 4px; }
-.jan-chart-wrap { height: 180px; position: relative; }
 
+/* ── Mood distribution — inline donut + legend ──────────── */
+.jan-donut-layout {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.jan-donut-wrap {
+  position: relative;
+  width: 100px;
+  height: 100px;
+  flex-shrink: 0;
+}
 .jan-mood-legend {
   display: flex;
-  flex-wrap: wrap;
-  gap: 6px 12px;
-  margin-top: 12px;
+  flex-direction: column;
+  gap: 5px;
+  flex: 1;
+  min-width: 0;
 }
-.jan-legend-item { display: flex; align-items: center; gap: 5px; font-size: 11px; color: var(--tx2); }
-.jan-legend-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-.jan-legend-pct { color: var(--tx3); font-size: 10px; }
+.jan-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 10.5px;
+  color: var(--tx2);
+  white-space: nowrap;
+}
+.jan-legend-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+.jan-legend-pct { color: var(--tx3); font-size: 9.5px; margin-left: auto; }
 
-/* Heatmap */
-.jan-heatmap { padding: 4px 0; }
-.jan-heat-grid { display: grid; grid-template-columns: repeat(12, 1fr); gap: 5px; }
-.jan-heat-cell { aspect-ratio: 1; border-radius: 3px; background: var(--border); transition: background .2s; }
+/* ── Heatmap — compact 12-week grid ────────────────────── */
+.jan-heatmap { }
+.jan-heat-labels {
+  display: flex;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.jan-heat-month-lbl {
+  flex: 1;
+  font-size: 8.5px;
+  color: var(--tx3);
+  text-align: center;
+}
+.jan-heat-grid {
+  display: grid;
+  grid-template-columns: repeat(12, 1fr);
+  gap: 4px;
+}
+.jan-heat-cell {
+  aspect-ratio: 1;
+  border-radius: 3px;
+  background: var(--bd);
+  transition: background .2s, transform .15s;
+  cursor: default;
+}
 .jan-heat-cell.active { background: #8b5cf6; }
-.jan-heat-cell:hover { opacity: 0.7; cursor: default; }
+.jan-heat-cell.active-hi { background: #6d28d9; }
+.jan-heat-cell:hover { transform: scale(1.15); opacity: .85; }
+.jan-heat-legend {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 7px;
+  font-size: 9px;
+  color: var(--tx3);
+}
+.jan-heat-sq {
+  width: 9px; height: 9px;
+  border-radius: 2px;
+  background: var(--bd);
+}
+.jan-heat-sq.on { background: #8b5cf6; }
 
+/* ── Insight chips ──────────────────────────────────────── */
+.jan-insights-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.jan-insight-chip {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  background: var(--sf);
+  border: 1px solid var(--bd);
+  border-radius: 9px;
+  padding: 9px 11px;
+  font-size: 11px;
+  color: var(--tx2);
+  flex: 1;
+  min-width: 180px;
+  animation: fadeUp .35s var(--ease) both;
+  transition: border-color .18s, transform .18s;
+}
+.jan-insight-chip:hover { border-color: var(--p, #8b5cf6); transform: translateY(-1px); }
+.jan-insight-emoji { font-size: 14px; flex-shrink: 0; margin-top: 1px; }
+.jan-insight-txt { line-height: 1.45; }
+.jan-insight-bold { font-weight: 700; color: var(--tx); display: block; margin-bottom: 1px; font-size: 11px; }
+
+/* ── Section header ─────────────────────────────────────── */
+.jan-section-label {
+  font-size: 9px;
+  font-weight: 700;
+  color: var(--tx3);
+  text-transform: uppercase;
+  letter-spacing: .08em;
+  padding-bottom: 2px;
+  border-bottom: 1px solid var(--bd);
+}
+
+/* ── Mood score indicator bar ───────────────────────────── */
+.jan-mood-score-bar {
+  height: 5px;
+  border-radius: 3px;
+  background: var(--bd);
+  overflow: hidden;
+  margin-top: 5px;
+}
+.jan-mood-score-fill {
+  height: 100%;
+  border-radius: 3px;
+  transition: width 1s cubic-bezier(.16,1,.3,1);
+  width: 0%;
+}
+
+/* Responsive */
 @media (max-width: 700px) {
   .jan-kpi-row { grid-template-columns: repeat(2, 1fr); }
-  .jan-grid { grid-template-columns: 1fr; }
-  .jan-card-wide { grid-column: 1; }
-  .jan-full-panel { padding: 16px; }
+  .jan-row2 { grid-template-columns: 1fr; }
+  .jan-donut-layout { flex-direction: column; align-items: flex-start; }
+  .jan-donut-wrap { width: 80px; height: 80px; }
 }
-
-@media (max-width: 640px) {
-  .jan-chart-section.jan-chart-half { width: 100%; display: block; margin-right: 0; }
-}
-@keyframes spin{to{transform:rotate(360deg)}}
-.H{display:none!important}
-@keyframes fadeUp{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
-@keyframes fadeIn{from{opacity:0}to{opacity:1}}
 @keyframes pop{0%{transform:scale(.8);opacity:0}60%{transform:scale(1.08)}100%{transform:scale(1);opacity:1}}
 @keyframes shimmer{0%{background-position:-500px 0}100%{background-position:500px 0}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}

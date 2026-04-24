@@ -882,220 +882,321 @@ function renderJournalAnalyticsPanel(journals) {
   wrap.className = 'jan-wrap';
 
   if (!journals.length) {
-    wrap.innerHTML = '<div style="padding:32px;text-align:center;font-size:13px;color:var(--tx3)">✍ Write a few entries to unlock analytics.</div>';
+    wrap.innerHTML = `
+      <div class="jan-empty" style="height:200px">
+        <div class="jan-empty-icon">✍️</div>
+        <div>Write a few entries to unlock your analytics dashboard.</div>
+      </div>`;
     return wrap;
   }
 
-  // ── Stats ─────────────────────────────────────────────────
-  const avgWords = Math.round(
-    journals.reduce((s, j) => s + (j.body || '').split(/\s+/).filter(Boolean).length, 0) / journals.length
-  );
+  // ── Core data calculations ─────────────────────────────────
+  const MOOD_SCORE = { '😢':1,'😞':2,'😐':3,'🙂':4,'😊':5,'😄':6,'🤩':7,'😡':1,'😰':2,'😴':3 };
+  const MOOD_COLORS = { '😄':'#22c55e','🤩':'#10b981','😊':'#86efac','🙂':'#fbbf24','😐':'#94a3b8','😞':'#f97316','😢':'#ef4444','😡':'#dc2626','😰':'#8b5cf6','😴':'#64748b' };
+
+  const sorted = [...journals].sort((a,b)=>a.date.localeCompare(b.date));
+  const withMood = sorted.filter(j=>j.mood && MOOD_SCORE[j.mood]!==undefined);
   const moodCounts = {};
-  journals.filter(j => j.mood).forEach(j => { moodCounts[j.mood] = (moodCounts[j.mood] || 0) + 1; });
-  const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
-  let streak = 0;
-  const td = today();
-  for (let i = 0; i < 365; i++) {
-    const d = dStr(addD(new Date(), -i));
-    if (journals.some(j => j.date === d)) streak++;
-    else if (i > 0) break;
+  journals.filter(j=>j.mood).forEach(j=>{ moodCounts[j.mood]=(moodCounts[j.mood]||0)+1; });
+  const topMood = Object.entries(moodCounts).sort((a,b)=>b[1]-a[1])[0];
+
+  const wordLens = journals.map(j=>(j.body||'').split(/\s+/).filter(Boolean).length);
+  const avgWords = Math.round(wordLens.reduce((a,b)=>a+b,0)/journals.length);
+
+  let streak=0;
+  for(let i=0;i<365;i++){
+    const d=dStr(addD(new Date(),-i));
+    if(journals.some(j=>j.date===d)) streak++;
+    else if(i>0) break;
   }
 
-  // ── KPI row ───────────────────────────────────────────────
+  const avgMoodScore = withMood.length
+    ? (withMood.reduce((s,j)=>s+(MOOD_SCORE[j.mood]||3),0)/withMood.length).toFixed(1)
+    : null;
+
+  // Tag frequency
+  const tagFreq = {};
+  journals.forEach(j=>(j.tags||[]).forEach(t=>{ tagFreq[t]=(tagFreq[t]||0)+1; }));
+  const topTag = Object.entries(tagFreq).sort((a,b)=>b[1]-a[1])[0];
+
+  const tc = ()=>isDk()?'#6b7280':'#9ca3af';
+  const gc = ()=>isDk()?'rgba(255,255,255,.05)':'rgba(0,0,0,.05)';
+
+  // ── KPI bar ────────────────────────────────────────────────
   const kpiRow = document.createElement('div');
   kpiRow.className = 'jan-kpi-row';
   kpiRow.innerHTML = [
-    { icon: '📊', val: journals.length, lbl: 'Total entries' },
-    { icon: '🔥', val: streak, lbl: 'Day streak' },
-    { icon: '📝', val: avgWords, lbl: 'Avg words' },
-    { icon: topMood ? topMood[0] : '😊', val: topMood ? topMood[1] : 0, lbl: 'Top mood count' }
-  ].map((k, i) => `
-    <div class="jan-kpi" style="animation-delay:${i * 60}ms">
+    { icon:'📊', val:journals.length, lbl:'Entries' },
+    { icon:'🔥', val:streak, lbl:'Day streak' },
+    { icon:'📝', val:avgWords+'w', lbl:'Avg words' },
+    { icon: topMood?topMood[0]:'😊', val:topMood?topMood[1]:0, lbl:'Top mood' }
+  ].map((k,i)=>`
+    <div class="jan-kpi" style="animation-delay:${i*55}ms">
       <div class="jan-kpi-icon">${k.icon}</div>
       <div class="jan-kpi-val">${k.val}</div>
       <div class="jan-kpi-lbl">${k.lbl}</div>
     </div>`).join('');
   wrap.appendChild(kpiRow);
 
-  // ── Mood over time chart ───────────────────────────────────
-  const MOOD_SCORE = { '😢': 1, '😞': 2, '😐': 3, '🙂': 4, '😊': 5, '😄': 6, '🤩': 7, '😡': 1, '😰': 2, '😴': 3 };
-  const moodEntries = journals.filter(j => j.mood && MOOD_SCORE[j.mood] !== undefined)
-    .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-30); // last 30 mood entries
+  // ── Section: Mood ──────────────────────────────────────────
+  const moodLabel = document.createElement('div');
+  moodLabel.className = 'jan-section-label';
+  moodLabel.textContent = 'Mood Analysis';
+  wrap.appendChild(moodLabel);
 
-  const moodSection = document.createElement('div');
-  moodSection.className = 'jan-chart-section';
-  moodSection.innerHTML = `
-    <div class="jan-chart-title">📈 Mood Over Time <span class="jan-chart-sub">(last 30 entries)</span></div>
-    <div class="jan-chart-wrap"><canvas id="moodLineChart"></canvas></div>`;
-  wrap.appendChild(moodSection);
+  // Mood over time + distribution side-by-side
+  const moodRow = document.createElement('div');
+  moodRow.className = 'jan-row2';
 
-  // ── Mood distribution donut ────────────────────────────────
-  const moodDistSection = document.createElement('div');
-  moodDistSection.className = 'jan-chart-section jan-chart-half';
-  moodDistSection.innerHTML = `
-    <div class="jan-chart-title">😊 Mood Distribution</div>
-    <div class="jan-chart-wrap" style="height:200px"><canvas id="moodDonutChart"></canvas></div>
-    <div id="moodLegend" class="jan-mood-legend"></div>`;
-  wrap.appendChild(moodDistSection);
+  // 1. Mood trend line
+  const moodTrendCard = document.createElement('div');
+  moodTrendCard.className = 'jan-chart-card';
+  moodTrendCard.style.animationDelay = '80ms';
+  moodTrendCard.innerHTML = `
+    <div class="jan-chart-head">
+      <div class="jan-chart-title">
+        📈 Mood Trend
+        <span class="jan-chart-sub">(last ${Math.min(withMood.length,30)} entries)</span>
+      </div>
+      <div class="jan-live-badge"><div class="jan-live-dot"></div>Live</div>
+    </div>
+    ${withMood.length<2
+      ? `<div class="jan-empty"><div class="jan-empty-icon">📉</div><div>Add mood to 2+ entries to see trend</div></div>`
+      : `<div class="jan-chart-wrap"><canvas id="jMoodLine"></canvas></div>`
+    }`;
+  moodRow.appendChild(moodTrendCard);
 
-  // ── Writing frequency heatmap (last 12 weeks) ──────────────
-  const heatSection = document.createElement('div');
-  heatSection.className = 'jan-chart-section jan-chart-half';
-  heatSection.innerHTML = `
-    <div class="jan-chart-title">📅 Writing Frequency <span class="jan-chart-sub">(last 12 weeks)</span></div>
-    <div id="journalHeatmap" class="jan-heatmap"></div>`;
-  wrap.appendChild(heatSection);
+  // 2. Mood donut + legend
+  const moodDistCard = document.createElement('div');
+  moodDistCard.className = 'jan-chart-card';
+  moodDistCard.style.animationDelay = '120ms';
+  const moodKeys = Object.keys(moodCounts);
+  const moodVals = moodKeys.map(k=>moodCounts[k]);
+  const moodColors = moodKeys.map(k=>MOOD_COLORS[k]||'#94a3b8');
+  const moodTotal = moodVals.reduce((a,b)=>a+b,0);
+  moodDistCard.innerHTML = `
+    <div class="jan-chart-head">
+      <div class="jan-chart-title">😊 Mood Split</div>
+    </div>
+    ${moodKeys.length
+      ? `<div class="jan-donut-layout">
+          <div class="jan-donut-wrap"><canvas id="jMoodDonut"></canvas></div>
+          <div class="jan-mood-legend" id="jMoodLegend"></div>
+        </div>`
+      : `<div class="jan-empty"><div class="jan-empty-icon">😶</div><div>No mood data yet</div></div>`
+    }`;
+  moodRow.appendChild(moodDistCard);
+  wrap.appendChild(moodRow);
 
-  // ── Words per entry bar chart ──────────────────────────────
-  const wordsSection = document.createElement('div');
-  wordsSection.className = 'jan-chart-section';
-  wordsSection.innerHTML = `
-    <div class="jan-chart-title">📝 Words per Entry <span class="jan-chart-sub">(last 14 entries)</span></div>
-    <div class="jan-chart-wrap"><canvas id="wordsBarChart"></canvas></div>`;
-  wrap.appendChild(wordsSection);
+  // ── Mood score indicator (if data) ────────────────────────
+  if (avgMoodScore) {
+    const scoreCard = document.createElement('div');
+    scoreCard.className = 'jan-chart-card';
+    scoreCard.style.animationDelay = '160ms';
+    const scorePct = Math.round(((+avgMoodScore-1)/6)*100);
+    const scoreColor = +avgMoodScore>=5?'#22c55e':+avgMoodScore>=3.5?'#fbbf24':'#ef4444';
+    const scoreLabel = +avgMoodScore>=6?'Excellent 🤩':+avgMoodScore>=5?'Happy 😊':+avgMoodScore>=4?'Good 🙂':+avgMoodScore>=3?'Neutral 😐':'Struggling 😞';
+    scoreCard.innerHTML = `
+      <div class="jan-chart-head">
+        <div class="jan-chart-title">🎯 Overall Wellbeing Score</div>
+        <div style="font-size:11px;font-weight:700;color:${scoreColor}">${avgMoodScore}/7 — ${scoreLabel}</div>
+      </div>
+      <div class="jan-mood-score-bar">
+        <div class="jan-mood-score-fill" id="jScoreFill" style="background:${scoreColor};width:0%"></div>
+      </div>
+      <div style="display:flex;justify-content:space-between;font-size:9px;color:var(--tx3);margin-top:5px">
+        <span>Low</span><span>Neutral</span><span>Excellent</span>
+      </div>`;
+    wrap.appendChild(scoreCard);
+    setTimeout(()=>{
+      const el=document.getElementById('jScoreFill');
+      if(el) el.style.width=scorePct+'%';
+    },300);
+  }
 
-  // ── Render charts after DOM insert ────────────────────────
-  const tc = () => isDk() ? '#6b7280' : '#9ca3af';
-  const gc = () => isDk() ? '#1f2937' : '#f3f4f6';
+  // ── Section: Writing ───────────────────────────────────────
+  const writingLabel = document.createElement('div');
+  writingLabel.className = 'jan-section-label';
+  writingLabel.textContent = 'Writing Habits';
+  wrap.appendChild(writingLabel);
 
-  requestAnimationFrame(() => {
+  const writingRow = document.createElement('div');
+  writingRow.className = 'jan-row2';
 
-    // 1. Mood line chart
-    if (moodEntries.length > 1) {
-      const moodColors = moodEntries.map(e => {
-        const s = MOOD_SCORE[e.mood] || 3;
-        return s >= 5 ? '#22c55e' : s >= 4 ? '#86efac' : s >= 3 ? '#fbbf24' : '#ef4444';
-      });
-      new Chart(document.getElementById('moodLineChart'), {
-        type: 'line',
-        data: {
-          labels: moodEntries.map(e => {
-            const d = new Date(e.date + 'T12:00:00');
-            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-          }),
-          datasets: [{
-            label: 'Mood',
-            data: moodEntries.map(e => MOOD_SCORE[e.mood] || 3),
-            borderColor: '#8b5cf6',
-            backgroundColor: 'rgba(139,92,246,0.08)',
-            borderWidth: 2.5,
-            fill: true,
-            tension: 0.4,
-            pointRadius: 5,
-            pointBackgroundColor: moodColors,
-            pointHoverRadius: 7
+  // 3. Words per entry bar chart
+  const wordsCard = document.createElement('div');
+  wordsCard.className = 'jan-chart-card';
+  wordsCard.style.animationDelay = '200ms';
+  const last14 = sorted.slice(-14);
+  wordsCard.innerHTML = `
+    <div class="jan-chart-head">
+      <div class="jan-chart-title">📝 Words per Entry <span class="jan-chart-sub">(last ${last14.length})</span></div>
+    </div>
+    <div class="jan-chart-wrap"><canvas id="jWordsBar"></canvas></div>`;
+  writingRow.appendChild(wordsCard);
+
+  // 4. Heatmap
+  const heatCard = document.createElement('div');
+  heatCard.className = 'jan-chart-card';
+  heatCard.style.animationDelay = '240ms';
+  heatCard.innerHTML = `
+    <div class="jan-chart-head">
+      <div class="jan-chart-title">📅 Consistency <span class="jan-chart-sub">(12 weeks)</span></div>
+      <span style="font-size:9px;color:var(--tx3)">${streak}d streak 🔥</span>
+    </div>
+    <div class="jan-heatmap" id="jHeatmap"></div>`;
+  writingRow.appendChild(heatCard);
+  wrap.appendChild(writingRow);
+
+  // ── Section: Insights ──────────────────────────────────────
+  const insightLabel = document.createElement('div');
+  insightLabel.className = 'jan-section-label';
+  insightLabel.textContent = 'Smart Insights';
+  wrap.appendChild(insightLabel);
+
+  // Generate insights
+  const chips = [];
+  if(streak>=7) chips.push({ emoji:'🔥', title:'Hot streak!', body:`${streak} days in a row. Your consistency is building a real habit.` });
+  else if(streak>=3) chips.push({ emoji:'📈', title:'Building momentum', body:`${streak}-day streak. Keep going!` });
+  else chips.push({ emoji:'💡', title:'Start a streak', body:'Write daily to build your longest streak.' });
+
+  if(avgWords>=150) chips.push({ emoji:'✍️', title:'Deep writer', body:`You average ${avgWords} words — that's rich, reflective writing.` });
+  else if(avgWords>0) chips.push({ emoji:'📏', title:'Avg entry length', body:`${avgWords} words per entry. Try expanding your thoughts for more insights.` });
+
+  if(topTag) chips.push({ emoji:'🏷️', title:`Top topic: ${topTag[0]}`, body:`You've written about ${topTag[0]} ${topTag[1]} time${topTag[1]>1?'s':''}.` });
+  if(topMood) chips.push({ emoji:topMood[0], title:'Dominant mood', body:`${topMood[0]} appears ${topMood[1]} time${topMood[1]>1?'s':''} — ${Math.round(topMood[1]/moodTotal*100)}% of entries.` });
+
+  if(avgMoodScore && +avgMoodScore<3) chips.push({ emoji:'💜', title:'Tough times', body:`Your average mood score is low. Consider what's been draining energy.` });
+  if(avgMoodScore && +avgMoodScore>=5.5) chips.push({ emoji:'🌟', title:'Thriving!', body:`Your mood average is ${avgMoodScore}/7. You're doing great.` });
+
+  const insightRow = document.createElement('div');
+  insightRow.className = 'jan-insights-row';
+  insightRow.innerHTML = chips.slice(0,4).map((c,i)=>`
+    <div class="jan-insight-chip" style="animation-delay:${260+i*50}ms">
+      <div class="jan-insight-emoji">${c.emoji}</div>
+      <div class="jan-insight-txt">
+        <span class="jan-insight-bold">${c.title}</span>
+        ${c.body}
+      </div>
+    </div>`).join('');
+  wrap.appendChild(insightRow);
+
+  // ── Render charts after DOM ────────────────────────────────
+  requestAnimationFrame(()=>{
+
+    // 1. Mood line
+    if(withMood.length>=2){
+      const last30 = withMood.slice(-30);
+      const moodPts = last30.map(e=>MOOD_SCORE[e.mood]||3);
+      const ptColors = moodPts.map(s=>s>=5?'#22c55e':s>=4?'#86efac':s>=3?'#fbbf24':'#ef4444');
+      new Chart(document.getElementById('jMoodLine'),{
+        type:'line',
+        data:{
+          labels:last30.map(e=>{ const d=new Date(e.date+'T12:00:00'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }),
+          datasets:[{
+            label:'Mood',
+            data:moodPts,
+            borderColor:'#8b5cf6',
+            backgroundColor:'rgba(139,92,246,0.07)',
+            borderWidth:2,
+            fill:true,
+            tension:0.45,
+            pointRadius:4,
+            pointBackgroundColor:ptColors,
+            pointBorderColor:'transparent',
+            pointHoverRadius:6
           }]
         },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          animation: { duration: 800, easing: 'easeInOutQuart' },
-          plugins: {
-            legend: { display: false },
-            tooltip: {
-              callbacks: {
-                label: c => {
-                  const e = moodEntries[c.dataIndex];
-                  const labels = { 1: 'Very low', 2: 'Low', 3: 'Neutral', 4: 'Good', 5: 'Happy', 6: 'Very happy', 7: 'Excellent' };
-                  return `${e.mood}  ${labels[c.parsed.y] || 'Neutral'}`;
-                }
-              }
-            }
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          animation:{ duration:900, easing:'easeInOutQuart' },
+          plugins:{
+            legend:{display:false},
+            tooltip:{ callbacks:{ label:c=>{ const labels={1:'😢 Very low',2:'😞 Low',3:'😐 Neutral',4:'🙂 Good',5:'😊 Happy',6:'😄 Great',7:'🤩 Excellent'}; return labels[c.parsed.y]||''; } } }
           },
-          scales: {
-            y: {
-              min: 1, max: 7,
-              ticks: {
-                stepSize: 1,
-                font: { size: 10 },
-                color: tc(),
-                callback: v => ['', '😢', '😞', '😐', '🙂', '😊', '😄', '🤩'][v] || ''
-              },
-              grid: { color: gc() }
-            },
-            x: { ticks: { font: { size: 9 }, color: tc(), maxTicksLimit: 10 }, grid: { display: false } }
+          scales:{
+            y:{ min:1,max:7, ticks:{ stepSize:1, font:{size:9}, color:tc(), callback:v=>['','😢','😞','😐','🙂','😊','😄','🤩'][v]||'' }, grid:{color:gc()} },
+            x:{ ticks:{font:{size:8},color:tc(),maxTicksLimit:8}, grid:{display:false} }
           }
         }
       });
-    } else {
-      document.getElementById('moodLineChart').closest('.jan-chart-wrap').innerHTML =
-        '<div style="height:180px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px">Add mood to at least 2 entries to see the trend</div>';
     }
 
     // 2. Mood donut
-    if (Object.keys(moodCounts).length) {
-      const MOOD_COLORS_MAP = { '😄': '#22c55e', '🤩': '#10b981', '😊': '#86efac', '🙂': '#fbbf24', '😐': '#94a3b8', '😞': '#f97316', '😢': '#ef4444', '😡': '#dc2626', '😰': '#8b5cf6', '😴': '#64748b' };
-      const labels = Object.keys(moodCounts);
-      const data = labels.map(k => moodCounts[k]);
-      const colors = labels.map(k => MOOD_COLORS_MAP[k] || '#94a3b8');
-      new Chart(document.getElementById('moodDonutChart'), {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: isDk() ? '#111827' : '#ffffff' }] },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          cutout: '60%',
-          animation: { duration: 700 },
-          plugins: {
-            legend: { display: false },
-            tooltip: { callbacks: { label: c => `${c.label}  ${c.parsed} entries (${Math.round(c.parsed / journals.filter(j => j.mood).length * 100)}%)` } }
-          }
+    if(moodKeys.length){
+      new Chart(document.getElementById('jMoodDonut'),{
+        type:'doughnut',
+        data:{ labels:moodKeys, datasets:[{ data:moodVals, backgroundColor:moodColors, borderWidth:2, borderColor:isDk()?'#111827':'#ffffff' }] },
+        options:{
+          responsive:true, maintainAspectRatio:false,
+          cutout:'65%',
+          animation:{ animateRotate:true, duration:700 },
+          plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`${c.label} · ${Math.round(c.parsed/moodTotal*100)}%` } } }
         }
       });
-      const total = data.reduce((a, b) => a + b, 0);
-      document.getElementById('moodLegend').innerHTML = labels.map((l, i) =>
-        `<div class="jan-legend-item"><span class="jan-legend-dot" style="background:${colors[i]}"></span>${l} <span class="jan-legend-pct">${Math.round(data[i] / total * 100)}%</span></div>`
+      document.getElementById('jMoodLegend').innerHTML = moodKeys.map((l,i)=>
+        `<div class="jan-legend-item"><span class="jan-legend-dot" style="background:${moodColors[i]}"></span>${l}<span class="jan-legend-pct">${Math.round(moodVals[i]/moodTotal*100)}%</span></div>`
       ).join('');
     }
 
-    // 3. Heatmap (last 12 weeks)
-    const heatEl = document.getElementById('journalHeatmap');
-    const dateSet = new Set(journals.map(j => j.date));
-    const today2 = new Date();
-    const days = [];
-    for (let i = 83; i >= 0; i--) {
-      const d = new Date(today2);
-      d.setDate(d.getDate() - i);
-      days.push(dStr(d));
-    }
-    const WDL = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    heatEl.innerHTML = `
-      <div class="jan-heat-grid">
-        ${days.map(d => {
-          const has = dateSet.has(d);
-          const dt = new Date(d + 'T12:00:00');
-          return `<div class="jan-heat-cell ${has ? 'active' : ''}" title="${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${has ? ' ✓' : ''}"></div>`;
-        }).join('')}
-      </div>`;
-
-    // 4. Words bar chart (last 14)
-    const last14 = [...journals].sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
-    const wordCounts = last14.map(j => (j.body || '').split(/\s+/).filter(Boolean).length);
-    const barColors = wordCounts.map(w => w > 200 ? '#8b5cf6' : w > 100 ? '#06b6d4' : w > 50 ? '#22c55e' : '#94a3b8');
-    new Chart(document.getElementById('wordsBarChart'), {
-      type: 'bar',
-      data: {
-        labels: last14.map(j => {
-          const d = new Date(j.date + 'T12:00:00');
-          return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        }),
-        datasets: [{ data: wordCounts, backgroundColor: barColors, borderRadius: 5, borderSkipped: false }]
+    // 3. Words bar
+    const wCounts = last14.map(j=>(j.body||'').split(/\s+/).filter(Boolean).length);
+    const wColors = wCounts.map(w=>w>200?'#8b5cf6':w>100?'#06b6d4':w>50?'#22c55e':'#94a3b8');
+    new Chart(document.getElementById('jWordsBar'),{
+      type:'bar',
+      data:{
+        labels:last14.map(j=>{ const d=new Date(j.date+'T12:00:00'); return d.toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }),
+        datasets:[{ data:wCounts, backgroundColor:wColors, borderRadius:5, borderSkipped:false }]
       },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 700, easing: 'easeOutQuart' },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: c => `${c.parsed.y} words` } }
+      options:{
+        responsive:true, maintainAspectRatio:false,
+        animation:{ duration:700, easing:'easeOutQuart',
+          onComplete: function() {
+            const chart = this;
+            const ctx = chart.ctx;
+            chart.data.datasets.forEach((ds, di) => {
+              const meta = chart.getDatasetMeta(di);
+              meta.data.forEach((bar, i) => {
+                const v = ds.data[i];
+                if(v>0) {
+                  ctx.fillStyle = tc();
+                  ctx.font = '8px sans-serif';
+                  ctx.textAlign = 'center';
+                  ctx.fillText(v, bar.x, bar.y-4);
+                }
+              });
+            });
+          }
         },
-        scales: {
-          y: { ticks: { font: { size: 10 }, color: tc() }, grid: { color: gc() } },
-          x: { ticks: { font: { size: 9 }, color: tc() }, grid: { display: false } }
+        plugins:{ legend:{display:false}, tooltip:{ callbacks:{ label:c=>`${c.parsed.y} words` } } },
+        scales:{
+          y:{ ticks:{font:{size:9},color:tc()}, grid:{color:gc()}, beginAtZero:true },
+          x:{ ticks:{font:{size:8},color:tc()}, grid:{display:false} }
         }
       }
     });
+
+    // 4. Heatmap
+    const heatEl = document.getElementById('jHeatmap');
+    if(heatEl){
+      const dateSet = new Set(journals.map(j=>j.date));
+      const today2 = new Date();
+      const days = [];
+      for(let i=83;i>=0;i--){ const d=new Date(today2); d.setDate(d.getDate()-i); days.push(dStr(d)); }
+      heatEl.innerHTML = `
+        <div class="jan-heat-grid">
+          ${days.map(d=>{
+            const has = dateSet.has(d);
+            const dt = new Date(d+'T12:00:00');
+            const lbl = dt.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+            return `<div class="jan-heat-cell ${has?'active':''}" title="${lbl}${has?' ✓ Written':''}"></div>`;
+          }).join('')}
+        </div>
+        <div class="jan-heat-legend">
+          <div class="jan-heat-sq"></div>No entry
+          <div class="jan-heat-sq on" style="margin-left:8px"></div>Written
+        </div>`;
+    }
   });
 
   return wrap;

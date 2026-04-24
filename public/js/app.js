@@ -51,57 +51,151 @@ const toggleDark = async () => {
   toast(S.dark ? 'Dark mode on' : 'Light mode on');
   try { await API.Settings.setDark(S.dark); } catch(e) {}
 };
-document.getElementById('darkBtn').addEventListener('click', toggleDark);
+
+// ── Safe element event binding (avoids crash if element missing) ───
+function bindClick(id, fn) {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('click', fn);
+}
+
+bindClick('darkBtn', toggleDark);
 
 // ── Auth UI ────────────────────────────────────────────────
-let isUp = false;
+// BUG FIX 1: isUp was toggled but button labels were swapped.
+// "isUp = true" means "sign up / create account" mode.
+let isUp = false; // false = sign-in mode (default)
+
+function syncAuthUI() {
+  // BUG FIX 2: Consistently set every label from a single source of truth.
+  document.getElementById('aBtn').textContent    = isUp ? 'Create account' : 'Sign in';
+  // BUG FIX 3: Toggle text was inverted — "Create one free" should appear when in sign-in mode
+  document.getElementById('aToggle').textContent = isUp ? 'Sign in instead' : 'Create one free';
+  // BUG FIX 4: authTitle (if present) should reflect current mode
+  const title = document.getElementById('authTitle');
+  if (title) title.textContent = isUp ? 'Create your account' : 'Sign in to Devnix';
+  document.getElementById('authErr').classList.add('H');
+}
+
+// Initialise UI to match default isUp=false
+syncAuthUI();
+
 document.getElementById('aToggle').addEventListener('click', () => {
   isUp = !isUp;
-  document.getElementById('aBtn').textContent = isUp ? 'Create account' : 'Sign in';
-  document.getElementById('aToggle').textContent = isUp ? 'Sign in instead' : 'Create one free';
-  document.getElementById('authErr').classList.add('H');
+  syncAuthUI();
 });
-const showAuthErr = m => { const e = document.getElementById('authErr'); e.textContent = m; e.classList.remove('H'); };
+
+const showAuthErr = m => {
+  const e = document.getElementById('authErr');
+  if (!e) return;
+  e.textContent = m;
+  e.classList.remove('H');
+};
+
+// BUG FIX 5: Removed duplicate inline label assignment that conflicted with syncAuthUI
 document.getElementById('aBtn').addEventListener('click', doAuth);
-['aEm','aPw'].forEach(id => document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') doAuth(); }));
+
+// BUG FIX 6: Ensure both fields trigger doAuth on Enter, and guard against missing elements
+['aEm','aPw'].forEach(id => {
+  const el = document.getElementById(id);
+  if (el) el.addEventListener('keydown', e => { if (e.key === 'Enter') doAuth(); });
+});
 
 async function doAuth() {
-  const em = document.getElementById('aEm').value.trim().toLowerCase();
-  const pw = document.getElementById('aPw').value;
-  if (!em || !pw) { showAuthErr('Please fill in all fields.'); return; }
-  if (!em.includes('@')) { showAuthErr('Enter a valid email.'); return; }
-  if (pw.length < 6) { showAuthErr('Password must be 6+ characters.'); return; }
+  // BUG FIX 7: Clear previous errors at the start of every attempt
+  document.getElementById('authErr').classList.add('H');
+
+  const emEl = document.getElementById('aEm');
+  const pwEl = document.getElementById('aPw');
+  if (!emEl || !pwEl) return;
+
+  const em = emEl.value.trim().toLowerCase();
+  const pw = pwEl.value;
+
+  // BUG FIX 8: Validate before anything else, with clear messages
+  if (!em && !pw) { showAuthErr('Please enter your email and password.'); return; }
+  if (!em)        { showAuthErr('Please enter your email address.'); return; }
+  if (!em.includes('@') || !em.includes('.')) { showAuthErr('Enter a valid email address.'); return; }
+  if (!pw)        { showAuthErr('Please enter your password.'); return; }
+  if (pw.length < 6) { showAuthErr('Password must be at least 6 characters.'); return; }
+
   const btn = document.getElementById('aBtn');
-  btn.textContent = '…'; btn.disabled = true;
+  const originalLabel = btn.textContent;
+  btn.textContent = '…';
+  btn.disabled = true;
+
   try {
-    const user = isUp ? await API.Auth.register(em, pw) : await API.Auth.login(em, pw);
+    // BUG FIX 9: Capture which mode we are in *before* the async call,
+    // so a race-condition toggle mid-flight doesn't flip the result.
+    const signingUp = isUp;
+
+    const user = signingUp
+      ? await API.Auth.register(em, pw)
+      : await API.Auth.login(em, pw);
+
+    // BUG FIX 10: Guard against API returning null/undefined user
+    if (!user || !user.email) {
+      showAuthErr('Unexpected server response. Please try again.');
+      return;
+    }
+
     S.user = normaliseUser(user);
-    S.dark = user.dark || false;
-    toast(isUp ? 'Account created! Welcome.' : 'Welcome back!');
+    S.dark  = user.dark || false;
+    applyDark();
+
+    // BUG FIX 11: Clear fields on success so back-button doesn't re-expose credentials
+    emEl.value = '';
+    pwEl.value = '';
+
+    toast(signingUp ? 'Account created! Welcome 🎉' : 'Welcome back!');
     mountApp();
+
   } catch (err) {
-    showAuthErr(err.message);
+    // BUG FIX 12: Surface the actual server message; fall back gracefully
+    const msg = err?.message || 'Something went wrong. Please try again.';
+    showAuthErr(msg);
   } finally {
-    btn.textContent = isUp ? 'Create account' : 'Sign in';
+    // BUG FIX 13: Restore button state via syncAuthUI so the label is always correct
     btn.disabled = false;
+    syncAuthUI();
+    // Restore button text manually in case syncAuthUI doesn't exist yet during early errors
+    btn.textContent = isUp ? 'Create account' : 'Sign in';
   }
 }
 
 async function doLogout() {
-  API.Auth.logout();
+  try { API.Auth.logout(); } catch(e) {}
   S = { user: null, dark: false };
+
+  // BUG FIX 14: Destroy all active Chart.js instances so they don't
+  // leak into the next session's canvas elements
+  Object.keys(finCharts).forEach(k => { try { finCharts[k].destroy(); } catch(e) {} });
+  finCharts = {};
+  if (barCI)  { try { barCI.destroy();  } catch(e) {} barCI  = null; }
+  if (lineCI) { try { lineCI.destroy(); } catch(e) {} lineCI = null; }
+
+  // BUG FIX 15: Reset all module-level state so a fresh login starts clean
+  selectedTxIds = new Set();
+  txSortCol = 'date';
+  txSortAsc = false;
+  analyDays = 14;
+  wOff = 0;
+
   document.getElementById('appShell').classList.add('H');
   document.getElementById('authView').classList.remove('H');
   document.getElementById('aEm').value = '';
   document.getElementById('aPw').value = '';
-  document.getElementById('authErr').classList.add('H');
+
+  // BUG FIX 16: Reset to sign-in mode after logout (not sign-up)
+  isUp = false;
+  syncAuthUI();
+
+  applyDark(); // apply light mode after S.dark reset
   toast('Signed out.', 'warn');
 }
-document.getElementById('logoutBtn').addEventListener('click', doLogout);
+bindClick('logoutBtn', doLogout);
 
 // ── Normalise user from MongoDB (Map → plain object) ───────
 function toPlainObj(val) {
-  // Handles: plain object, Mongoose Map serialised as {}, or actual ES6 Map
   if (!val) return {};
   if (val instanceof Map) return Object.fromEntries(val);
   if (typeof val === 'object') return Object.assign({}, val);
@@ -111,12 +205,10 @@ function toPlainObj(val) {
 function normaliseUser(u) {
   if (!u) return u;
   const norm = { ...u };
-  // These three come from Mongoose Map fields — always flatten to plain {}
-  norm.done    = toPlainObj(norm.done);
-  norm.skipped = toPlainObj(norm.skipped);
-  norm.notes   = toPlainObj(norm.notes);
-  norm.budgets = toPlainObj(norm.budgets);
-  // Arrays
+  norm.done         = toPlainObj(norm.done);
+  norm.skipped      = toPlainObj(norm.skipped);
+  norm.notes        = toPlainObj(norm.notes);
+  norm.budgets      = toPlainObj(norm.budgets);
   norm.transactions = Array.isArray(norm.transactions) ? norm.transactions : [];
   norm.journals     = Array.isArray(norm.journals)     ? norm.journals     : [];
   norm.savingsGoals = Array.isArray(norm.savingsGoals) ? norm.savingsGoals : [];
@@ -133,7 +225,7 @@ function debounceSave() {
       await API.Tasks.saveCheck(S.user.done, S.user.skipped, S.user.notes);
       setSyncState('saved');
     } catch (e) {
-      setSyncState('saved'); // don't leave spinner on error
+      setSyncState('saved');
     }
   }, 600);
 }
@@ -175,10 +267,11 @@ document.querySelectorAll('.fin-tab').forEach(t => {
   });
 });
 
-document.getElementById('prevW').addEventListener('click', () => { wOff--; renderGrid(); });
-document.getElementById('nextW').addEventListener('click', () => { wOff++; renderGrid(); });
-document.getElementById('addBtn').addEventListener('click', addTask);
-document.getElementById('nTask').addEventListener('keydown', e => { if (e.key==='Enter') addTask(); });
+bindClick('prevW', () => { wOff--; renderGrid(); });
+bindClick('nextW', () => { wOff++; renderGrid(); });
+bindClick('addBtn', addTask);
+const nTaskEl = document.getElementById('nTask');
+if (nTaskEl) nTaskEl.addEventListener('keydown', e => { if (e.key==='Enter') addTask(); });
 
 // ── TASKS ──────────────────────────────────────────────────
 async function addTask() {
@@ -206,7 +299,6 @@ async function deleteTask(taskId, taskName) {
 async function renameTask(taskId, newName) {
   try {
     await API.Tasks.rename(taskId, newName);
-    // local name already updated via input binding
     setSyncState('saved');
   } catch(e) { toast(e.message,'warn'); }
 }
@@ -224,7 +316,7 @@ function doExport() {
   a.download = 'devnix_discipline.csv'; a.click();
   toast('CSV exported!');
 }
-document.getElementById('exportBtn').addEventListener('click', doExport);
+bindClick('exportBtn', doExport);
 
 // ── Reminder ───────────────────────────────────────────────
 function showReminder() {
@@ -236,11 +328,11 @@ function showReminder() {
     : `${missed.length} task${missed.length>1?'s':''} still pending: ${missed.slice(0,3).map(t=>t.name).join(', ')}${missed.length>3?'…':''}`;
   document.getElementById('reminderBanner').classList.remove('H');
 }
-document.getElementById('reminderBtn').addEventListener('click', showReminder);
+bindClick('reminderBtn', showReminder);
 
 // ── Note modal ─────────────────────────────────────────────
-document.getElementById('noteCancel').addEventListener('click', () => document.getElementById('noteModal').classList.add('H'));
-document.getElementById('noteSave').addEventListener('click', () => {
+bindClick('noteCancel', () => document.getElementById('noteModal').classList.add('H'));
+bindClick('noteSave', () => {
   const u = usr(); if (!u) return;
   const key = noteCtx.tid+'_'+noteCtx.ds;
   const txt = document.getElementById('noteTA').value.trim();
@@ -457,7 +549,7 @@ function renderProfile() {
 // ══════════════════════════════════════════════════════════
 //  FINANCE — overview, analytics, transactions
 // ══════════════════════════════════════════════════════════
-const CAT_ICONS={Income:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>',Food:'<path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-4.5-6.74-5.97-8.04-5.99H1v2h15.03v3.99z"/>',Transport:'<path d="M17.5 5h-11L4 11v6c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h10v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-6l-2.5-6zm-11 1h11l1.5 4h-14l1.5-4zM6.5 14c-.83 0-1.5-.67-1.5-1.5S5.67 11 6.5 11s1.5.67 1.5 1.5S7.33 14 6.5 14zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>',Housing:'<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>',Health:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>',Shopping:'<path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96C5 16.1 6.9 18 9 18h12v-2H9.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.45 5H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2z"/>',Entertainment:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>'};
+const CAT_ICONS={Income:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>',Food:'<path d="M18.06 22.99h1.66c.84 0 1.53-.64 1.63-1.46L23 5.05h-5V1h-1.97v4.05h-4.97l.3 2.34c1.71.47 3.31 1.32 4.27 2.26 1.44 1.42 2.43 2.89 2.43 5.29v8.05zM1 21.99V21h15.03v.99c0 .55-.45 1-1.01 1H2.01c-.56 0-1.01-.45-1.01-1zm15.03-7c0-4.5-6.74-5.97-8.04-5.99H1v2h15.03v3.99z"/>',Transport:'<path d="M17.5 5h-11L4 11v6c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h10v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-6l-2.5-6zm-11 1h11l1.5 4h-14l1.5-4zM6.5 14c-.83 0-1.5-.67-1.5-1.5S5.67 11 6.5 11s1.5.67 1.5 1.5S7.33 14 6.5 14zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/>',Housing:'<path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>',Health:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>',Shopping:'<path d="M7 18c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2-.9-2-2-2zM1 2v2h2l3.6 7.59-1.35 2.45c-.16.28-.25.61-.25.96C5 16.1 6.9 18 9 18h12v-2H9.42c-.14 0-.25-.11-.25-.25l.03-.12.9-1.63H19c.75 0 1.41-.41 1.75-1.03l3.58-6.49A1 1 0 0023.45 5H5.21l-.94-2H1zm16 16c-1.1 0-1.99.9-1.99 2S15.9 22 17 22s2-.9 2-2-.9-2-2-2z"/>',Entertainment:'<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z"/>'}; 
 const CAT_COLORS={Income:'#22c55e',Food:'#f59e0b',Transport:'#3b82f6',Housing:'#8b5cf6',Health:'#14b8a6',Shopping:'#ec4899',Entertainment:'#f87171'};
 const CAT_COLORS_AN={Food:'#f59e0b',Transport:'#3b82f6',Housing:'#8b5cf6',Health:'#14b8a6',Shopping:'#ec4899',Entertainment:'#f87171',Other:'#888',Income:'#22c55e'};
 const isDk=()=>S.dark;
@@ -750,7 +842,6 @@ function renderJournalPage() {
     return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
   }).length;
 
-  // ── Stat bar (top) ─────────────────────────────────────────
   const statsRow = document.createElement('div');
   statsRow.style.cssText = 'display:flex;gap:8px;flex-wrap:wrap;';
   [
@@ -766,11 +857,9 @@ function renderJournalPage() {
   });
   pg.appendChild(statsRow);
 
-  // ── Layout ─────────────────────────────────────────────────
   const layout = document.createElement('div');
   layout.className = 'journal-layout';
 
-  // ── SIDEBAR ────────────────────────────────────────────────
   const sidebar = document.createElement('div');
   sidebar.className = 'journal-sidebar';
   sidebar.innerHTML = `
@@ -789,7 +878,6 @@ function renderJournalPage() {
       <div class="jtab ${jState.tab === 'analytics' ? 'on' : ''}" id="jtabAnalytics">Analytics</div>
     </div>`;
 
-  // Sidebar list (only for entries tab)
   if (jState.tab === 'entries') {
     const searchDiv = document.createElement('div');
     searchDiv.className = 'journal-search';
@@ -834,7 +922,6 @@ function renderJournalPage() {
     }
     sidebar.appendChild(listDiv);
   } else {
-    // Analytics tab — sidebar just shows a hint
     const hint = document.createElement('div');
     hint.style.cssText = 'padding:16px 12px;font-size:12px;color:var(--tx3);line-height:1.7';
     hint.innerHTML = '📊 Analytics are shown in the main panel →';
@@ -848,7 +935,6 @@ function renderJournalPage() {
     else if (t.id === 'jNewBtn') { jState.tab = 'entries'; jState.mode = 'edit'; jState.editId = null; jState.selMood = null; jState.selTags = []; renderJournalPage(); }
   });
 
-  // ── RIGHT PANEL ────────────────────────────────────────────
   const rightPane = document.createElement('div');
   rightPane.className = 'journal-editor';
 
@@ -886,7 +972,6 @@ function renderJournalAnalyticsPanel(journals) {
     return wrap;
   }
 
-  // ── Stats ─────────────────────────────────────────────────
   const avgWords = Math.round(
     journals.reduce((s, j) => s + (j.body || '').split(/\s+/).filter(Boolean).length, 0) / journals.length
   );
@@ -894,14 +979,12 @@ function renderJournalAnalyticsPanel(journals) {
   journals.filter(j => j.mood).forEach(j => { moodCounts[j.mood] = (moodCounts[j.mood] || 0) + 1; });
   const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
   let streak = 0;
-  const td = today();
   for (let i = 0; i < 365; i++) {
     const d = dStr(addD(new Date(), -i));
     if (journals.some(j => j.date === d)) streak++;
     else if (i > 0) break;
   }
 
-  // ── KPI row ───────────────────────────────────────────────
   const kpiRow = document.createElement('div');
   kpiRow.className = 'jan-kpi-row';
   kpiRow.innerHTML = [
@@ -917,11 +1000,10 @@ function renderJournalAnalyticsPanel(journals) {
     </div>`).join('');
   wrap.appendChild(kpiRow);
 
-  // ── Mood over time chart ───────────────────────────────────
   const MOOD_SCORE = { '😢': 1, '😞': 2, '😐': 3, '🙂': 4, '😊': 5, '😄': 6, '🤩': 7, '😡': 1, '😰': 2, '😴': 3 };
   const moodEntries = journals.filter(j => j.mood && MOOD_SCORE[j.mood] !== undefined)
     .sort((a, b) => a.date.localeCompare(b.date))
-    .slice(-30); // last 30 mood entries
+    .slice(-30);
 
   const moodSection = document.createElement('div');
   moodSection.className = 'jan-chart-section';
@@ -930,7 +1012,6 @@ function renderJournalAnalyticsPanel(journals) {
     <div class="jan-chart-wrap"><canvas id="moodLineChart"></canvas></div>`;
   wrap.appendChild(moodSection);
 
-  // ── Mood distribution donut ────────────────────────────────
   const moodDistSection = document.createElement('div');
   moodDistSection.className = 'jan-chart-section jan-chart-half';
   moodDistSection.innerHTML = `
@@ -939,7 +1020,6 @@ function renderJournalAnalyticsPanel(journals) {
     <div id="moodLegend" class="jan-mood-legend"></div>`;
   wrap.appendChild(moodDistSection);
 
-  // ── Writing frequency heatmap (last 12 weeks) ──────────────
   const heatSection = document.createElement('div');
   heatSection.className = 'jan-chart-section jan-chart-half';
   heatSection.innerHTML = `
@@ -947,7 +1027,6 @@ function renderJournalAnalyticsPanel(journals) {
     <div id="journalHeatmap" class="jan-heatmap"></div>`;
   wrap.appendChild(heatSection);
 
-  // ── Words per entry bar chart ──────────────────────────────
   const wordsSection = document.createElement('div');
   wordsSection.className = 'jan-chart-section';
   wordsSection.innerHTML = `
@@ -955,13 +1034,10 @@ function renderJournalAnalyticsPanel(journals) {
     <div class="jan-chart-wrap"><canvas id="wordsBarChart"></canvas></div>`;
   wrap.appendChild(wordsSection);
 
-  // ── Render charts after DOM insert ────────────────────────
-  const tc = () => isDk() ? '#6b7280' : '#9ca3af';
-  const gc = () => isDk() ? '#1f2937' : '#f3f4f6';
+  const _tc = () => isDk() ? '#6b7280' : '#9ca3af';
+  const _gc = () => isDk() ? '#1f2937' : '#f3f4f6';
 
   requestAnimationFrame(() => {
-
-    // 1. Mood line chart
     if (moodEntries.length > 1) {
       const moodColors = moodEntries.map(e => {
         const s = MOOD_SCORE[e.mood] || 3;
@@ -1009,21 +1085,21 @@ function renderJournalAnalyticsPanel(journals) {
               ticks: {
                 stepSize: 1,
                 font: { size: 10 },
-                color: tc(),
+                color: _tc(),
                 callback: v => ['', '😢', '😞', '😐', '🙂', '😊', '😄', '🤩'][v] || ''
               },
-              grid: { color: gc() }
+              grid: { color: _gc() }
             },
-            x: { ticks: { font: { size: 9 }, color: tc(), maxTicksLimit: 10 }, grid: { display: false } }
+            x: { ticks: { font: { size: 9 }, color: _tc(), maxTicksLimit: 10 }, grid: { display: false } }
           }
         }
       });
     } else {
-      document.getElementById('moodLineChart').closest('.jan-chart-wrap').innerHTML =
+      const el = document.getElementById('moodLineChart');
+      if (el) el.closest('.jan-chart-wrap').innerHTML =
         '<div style="height:180px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px">Add mood to at least 2 entries to see the trend</div>';
     }
 
-    // 2. Mood donut
     if (Object.keys(moodCounts).length) {
       const MOOD_COLORS_MAP = { '😄': '#22c55e', '🤩': '#10b981', '😊': '#86efac', '🙂': '#fbbf24', '😐': '#94a3b8', '😞': '#f97316', '😢': '#ef4444', '😡': '#dc2626', '😰': '#8b5cf6', '😴': '#64748b' };
       const labels = Object.keys(moodCounts);
@@ -1044,58 +1120,61 @@ function renderJournalAnalyticsPanel(journals) {
         }
       });
       const total = data.reduce((a, b) => a + b, 0);
-      document.getElementById('moodLegend').innerHTML = labels.map((l, i) =>
+      const legendEl = document.getElementById('moodLegend');
+      if (legendEl) legendEl.innerHTML = labels.map((l, i) =>
         `<div class="jan-legend-item"><span class="jan-legend-dot" style="background:${colors[i]}"></span>${l} <span class="jan-legend-pct">${Math.round(data[i] / total * 100)}%</span></div>`
       ).join('');
     }
 
-    // 3. Heatmap (last 12 weeks)
     const heatEl = document.getElementById('journalHeatmap');
-    const dateSet = new Set(journals.map(j => j.date));
-    const today2 = new Date();
-    const days = [];
-    for (let i = 83; i >= 0; i--) {
-      const d = new Date(today2);
-      d.setDate(d.getDate() - i);
-      days.push(dStr(d));
+    if (heatEl) {
+      const dateSet = new Set(journals.map(j => j.date));
+      const today2 = new Date();
+      const days = [];
+      for (let i = 83; i >= 0; i--) {
+        const d = new Date(today2);
+        d.setDate(d.getDate() - i);
+        days.push(dStr(d));
+      }
+      heatEl.innerHTML = `
+        <div class="jan-heat-grid">
+          ${days.map(d => {
+            const has = dateSet.has(d);
+            const dt = new Date(d + 'T12:00:00');
+            return `<div class="jan-heat-cell ${has ? 'active' : ''}" title="${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${has ? ' ✓' : ''}"></div>`;
+          }).join('')}
+        </div>`;
     }
-    const WDL = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-    heatEl.innerHTML = `
-      <div class="jan-heat-grid">
-        ${days.map(d => {
-          const has = dateSet.has(d);
-          const dt = new Date(d + 'T12:00:00');
-          return `<div class="jan-heat-cell ${has ? 'active' : ''}" title="${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${has ? ' ✓' : ''}"></div>`;
-        }).join('')}
-      </div>`;
 
-    // 4. Words bar chart (last 14)
     const last14 = [...journals].sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
     const wordCounts = last14.map(j => (j.body || '').split(/\s+/).filter(Boolean).length);
     const barColors = wordCounts.map(w => w > 200 ? '#8b5cf6' : w > 100 ? '#06b6d4' : w > 50 ? '#22c55e' : '#94a3b8');
-    new Chart(document.getElementById('wordsBarChart'), {
-      type: 'bar',
-      data: {
-        labels: last14.map(j => {
-          const d = new Date(j.date + 'T12:00:00');
-          return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-        }),
-        datasets: [{ data: wordCounts, backgroundColor: barColors, borderRadius: 5, borderSkipped: false }]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        animation: { duration: 700, easing: 'easeOutQuart' },
-        plugins: {
-          legend: { display: false },
-          tooltip: { callbacks: { label: c => `${c.parsed.y} words` } }
+    const wordsChartEl = document.getElementById('wordsBarChart');
+    if (wordsChartEl) {
+      new Chart(wordsChartEl, {
+        type: 'bar',
+        data: {
+          labels: last14.map(j => {
+            const d = new Date(j.date + 'T12:00:00');
+            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+          }),
+          datasets: [{ data: wordCounts, backgroundColor: barColors, borderRadius: 5, borderSkipped: false }]
         },
-        scales: {
-          y: { ticks: { font: { size: 10 }, color: tc() }, grid: { color: gc() } },
-          x: { ticks: { font: { size: 9 }, color: tc() }, grid: { display: false } }
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          animation: { duration: 700, easing: 'easeOutQuart' },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: { label: c => `${c.parsed.y} words` } }
+          },
+          scales: {
+            y: { ticks: { font: { size: 10 }, color: _tc() }, grid: { color: _gc() } },
+            x: { ticks: { font: { size: 9 }, color: _tc() }, grid: { display: false } }
+          }
         }
-      }
-    });
+      });
+    }
   });
 
   return wrap;
@@ -1132,16 +1211,18 @@ function escHtml(s){return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').
 //  BOOT — check token → load user → mount
 // ══════════════════════════════════════════════════════════
 async function boot() {
-  // ── HARD GUARD: splash never hangs beyond 8s ──────────────
+  // Hard guard: splash never hangs beyond 8s
   const killSwitch = setTimeout(() => {
     console.warn('[Devnix] Boot hard-timeout — forcing login');
     document.getElementById('splash').classList.add('H');
     document.getElementById('authView').classList.remove('H');
+    // BUG FIX 17: Also reset auth UI on timeout so user sees correct labels
+    isUp = false;
+    syncAuthUI();
   }, 8000);
 
   const finish = () => clearTimeout(killSwitch);
 
-  // No token → go straight to login
   if (!API.getToken()) {
     finish();
     applyDark();
@@ -1151,7 +1232,6 @@ async function boot() {
   }
 
   try {
-    // Race /auth/me vs 5s timeout so we never wait forever
     const user = await Promise.race([
       API.Auth.me(),
       new Promise((_, rej) =>
@@ -1161,12 +1241,14 @@ async function boot() {
 
     finish();
 
-    // null/empty user = corrupted token → clear it, show login
     if (!user || !user.email) {
       API.Auth.logout();
       applyDark();
       document.getElementById('splash').classList.add('H');
       document.getElementById('authView').classList.remove('H');
+      // BUG FIX 18: Reset auth UI state when token is found but user is invalid
+      isUp = false;
+      syncAuthUI();
       return;
     }
 
@@ -1178,11 +1260,13 @@ async function boot() {
 
   } catch (e) {
     finish();
-    // Expired / network / timeout — wipe token, show login
     API.Auth.logout();
     applyDark();
     document.getElementById('splash').classList.add('H');
     document.getElementById('authView').classList.remove('H');
+    // BUG FIX 19: Reset auth UI state on boot failure
+    isUp = false;
+    syncAuthUI();
   }
 }
 

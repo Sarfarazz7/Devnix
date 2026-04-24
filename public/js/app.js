@@ -72,36 +72,45 @@ document.getElementById('aBtn').addEventListener('click', doAuth);
 ['aEm','aPw'].forEach(id => document.getElementById(id).addEventListener('keydown', e => { if (e.key==='Enter') doAuth(); }));
 
 async function doAuth() {
-  const em = document.getElementById('aEm').value.trim().toLowerCase();
-  const pw = document.getElementById('aPw').value;
-  if (!em || !pw) { showAuthErr('Please fill in all fields.'); return; }
-  if (!em.includes('@')) { showAuthErr('Enter a valid email.'); return; }
-  if (pw.length < 6) { showAuthErr('Password must be 6+ characters.'); return; }
+  const em = (document.getElementById('aEm').value || '').trim().toLowerCase();
+  const pw = document.getElementById('aPw').value || '';
+  const remember = document.getElementById('aRem') ? document.getElementById('aRem').checked : true;
 
-  // FIX #2: Read the "stay signed in" checkbox
-  const remember = document.getElementById('aRem')?.checked || false;
+  if (!em || !pw) { showAuthErr('Please fill in all fields.'); return; }
+  if (!em.includes('@') || !em.includes('.')) { showAuthErr('Enter a valid email address.'); return; }
+  if (pw.length < 6) { showAuthErr('Password must be at least 6 characters.'); return; }
 
   const btn = document.getElementById('aBtn');
   const origText = btn.textContent;
-  btn.textContent = '…'; btn.disabled = true;
+  btn.textContent = '…';
+  btn.disabled = true;
   document.getElementById('authErr').classList.add('H');
+
   try {
-    const user = isUp
-      ? await API.Auth.register(em, pw, remember)
-      : await API.Auth.login(em, pw, remember);
+    let user;
+    if (isUp) {
+      user = await API.Auth.register(em, pw);
+    } else {
+      user = await API.Auth.login(em, pw, remember);
+    }
+
+    if (!user || !user.email) {
+      throw new Error('Invalid response from server. Please try again.');
+    }
+
     S.user = normaliseUser(user);
-    S.dark = user.dark || false;
+    S.dark = !!(user.dark);
     applyDark();
-    toast(isUp ? 'Account created! Welcome.' : 'Welcome back!');
+
+    toast(isUp ? 'Account created! Welcome to Devnix 🎉' : 'Welcome back! 👋');
     mountApp();
   } catch (err) {
-    showAuthErr(err.message || 'Something went wrong. Please try again.');
+    showAuthErr(err.message || 'Authentication failed. Please try again.');
   } finally {
     btn.textContent = origText;
     btn.disabled = false;
   }
 }
-
 async function doLogout() {
   try { API.Auth.logout(); } catch(e) { /* ignore */ }
   S = { user: null, dark: false };
@@ -1255,90 +1264,76 @@ function renderJournalBookView(wrap,entry){
 // ══════════════════════════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════════════════════════
-async function boot(){
-  // FIX #3: guard against missing API.getToken
-  const token = typeof API?.getToken === 'function' ? API.getToken() : null;
-
-  // Hard timeout — splash never hangs beyond 8s
-  const killSwitch=setTimeout(()=>{
-    console.warn('[Devnix] Boot hard-timeout — forcing login');
+async function boot() {
+  // ── Hard timeout: max 8s on splash ────────────────────────
+  const killSwitch = setTimeout(() => {
+    console.warn('[Devnix] Boot timeout — forcing login screen');
     document.getElementById('splash').classList.add('H');
     document.getElementById('authView').classList.remove('H');
-  },8000);
-  // Show "waking up" after 3s
-  const slowTimer=setTimeout(()=>{
-    const el=document.getElementById('splashSlow');
-    if(el&&!document.getElementById('splash').classList.contains('H'))el.style.display='block';
-  },3000);
-  const finish=()=>{clearTimeout(killSwitch);clearTimeout(slowTimer);};
+  }, 8000);
 
-  if(!token){
-    finish();applyDark();
+  const finish = () => clearTimeout(killSwitch);
+
+  // Apply saved dark mode preference before anything renders
+  try {
+    const savedDark = localStorage.getItem('devnix_dark');
+    if (savedDark === 'true') { S.dark = true; applyDark(); }
+  } catch (e) { /* storage blocked */ }
+
+  // No token → show login immediately
+  if (!API.getToken()) {
+    finish();
     document.getElementById('splash').classList.add('H');
     document.getElementById('authView').classList.remove('H');
     return;
   }
-  try{
-    const user=await Promise.race([
+
+  try {
+    // Race: /auth/me vs 6s timeout
+    const user = await Promise.race([
       API.Auth.me(),
-      new Promise((_,rej)=>setTimeout(()=>rej(new Error('timeout')),5000))
+      new Promise((_, rej) => setTimeout(() => rej(new Error('Request timed out')), 6000))
     ]);
+
     finish();
-    if(!user||!user.email){
-      API.Auth.logout();applyDark();
+
+    if (!user || !user.email) {
+      API.Auth.logout();
       document.getElementById('splash').classList.add('H');
       document.getElementById('authView').classList.remove('H');
       return;
     }
-    S.user=normaliseUser(user);S.dark=user.dark||false;applyDark();
+
+    S.user = normaliseUser(user);
+    S.dark = !!(user.dark);
+    applyDark();
     document.getElementById('splash').classList.add('H');
     mountApp();
-  }catch(e){
+
+  } catch (e) {
     finish();
-    try{API.Auth.logout();}catch(e2){}
+    console.warn('[Devnix] Boot failed:', e.message);
+    API.Auth.logout();
     applyDark();
     document.getElementById('splash').classList.add('H');
     document.getElementById('authView').classList.remove('H');
   }
 }
-
-function mountApp(){
+function mountApp() {
   document.getElementById('authView').classList.add('H');
   document.getElementById('splash').classList.add('H');
   document.getElementById('appShell').classList.remove('H');
-  const u=S.user;
-  document.getElementById('nbAv').textContent=(u?.email||'?').split('@')[0][0]?.toUpperCase()||'?';
-  // Reset to dashboard tab
-  document.querySelectorAll('.nb-btn').forEach(b=>b.classList.remove('on'));
-  document.querySelector('.nb-btn[data-pg="dashboard"]')?.classList.add('on');
-  ['pgFinance','pgJournal','pgProfile'].forEach(id=>document.getElementById(id)?.classList.add('H'));
-  document.getElementById('pgDashboard')?.classList.remove('H');
-  applyDark();wOff=0;
+
+  const u = S.user;
+  const av = document.getElementById('nbAv');
+  if (av) av.textContent = ((u?.email || '?').split('@')[0][0] || '?').toUpperCase();
+
+  applyDark();
+  wOff = 0;
+  selectedTxIds.clear();
+
   renderGrid();
-  setTimeout(()=>renderDisciplineAnalytics(),750);
+  setTimeout(() => renderDisciplineAnalytics(), 800);
   setSyncState('saved');
 }
-
-// ── Budget & goal modal buttons — wired ONCE at startup ─────────────────────
-// FIX: Previously only wired inside renderFinAnalytics(), causing silent failure
-// if the budget modal was opened before the Analytics tab was visited.
-(function wireBudgetGoalModals(){
-  const bmCancel=document.getElementById('bmCancel');
-  const bmSave=document.getElementById('bmSave');
-  const gmCancel=document.getElementById('gmCancel');
-  const gmSave=document.getElementById('gmSave');
-  if(bmCancel)bmCancel.onclick=()=>document.getElementById('budgetModal').classList.add('H');
-  if(bmSave)bmSave.onclick=saveBudget;
-  if(gmCancel)gmCancel.onclick=()=>document.getElementById('goalModal').classList.add('H');
-  if(gmSave)gmSave.onclick=saveGoal;
-  document.getElementById('gmColorPicker')?.querySelectorAll('span').forEach(s=>{
-    s.onclick=()=>{
-      _anSelColor=s.dataset.c;
-      const inp=document.getElementById('gmColor');if(inp)inp.value=_anSelColor;
-      document.getElementById('gmColorPicker').querySelectorAll('span').forEach(x=>x.style.border='2px solid transparent');
-      s.style.border='2px solid var(--tx)';
-    };
-  });
-})();
-
 boot();

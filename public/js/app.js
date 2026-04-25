@@ -1808,8 +1808,6 @@ function renderJournalEditorForm(wrap) {
   bodyInp.addEventListener('input', updateWC);
   updateWC();
 
-bodyInp.addEventListener('input', updateWC);
-  updateWC();
 
   // ── AI Tab Autocomplete ──────────────────────────────────
   let ghostText = '';

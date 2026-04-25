@@ -1845,7 +1845,7 @@ bodyInp.addEventListener('input', updateWC);
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text:
-              `You are a journal writing assistant. Continue this journal entry naturally in the same tone and style. Return ONLY the continuation text (max 1-2 sentences). No explanations, no quotes.\n\nJournal so far:\n${text}`
+              'You are a journal writing assistant. Continue this journal entry naturally in the same tone and style. Return ONLY the continuation text (max 1-2 sentences). No explanations, no quotes.\n\nJournal so far:\n' + text
             }] }],
             generationConfig: { maxOutputTokens: 60, temperature: 0.7 }
           })

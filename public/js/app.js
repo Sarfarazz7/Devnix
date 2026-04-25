@@ -1748,7 +1748,14 @@ function renderJournalAnalyticsPanel(journals) {
     // Mood donut
     const moodDonutEl = document.getElementById('moodDonutChart');
     if (moodDonutEl && Object.keys(moodCounts).length) {
-      const MOOD_COLORS_MAP = { '😄': '#22c55e', '🤩': '#10b981', '😊': '#86efac', '🙂': '#fbbf24', '😐': '#94a3b8', '😞': '#f97316', '😢': '#ef4444', '😡': '#dc2626', '😰': '#8b5cf6', '😴': '#64748b' };
+      const MOOD_COLORS_MAP = {
+        '😊': '#22c55e', '😌': '#06b6d4', '🔥': '#f97316',
+        '😔': '#64748b', '😤': '#ef4444', '😴': '#94a3b8',
+        '🤔': '#8b5cf6', '🎉': '#fbbf24',
+        '😄': '#16a34a', '🤩': '#10b981', '🙂': '#86efac',
+        '😐': '#cbd5e1', '😞': '#fb923c', '😢': '#dc2626',
+        '😡': '#b91c1c', '😰': '#7c3aed'
+      };
       const labels = Object.keys(moodCounts), data = labels.map(k => moodCounts[k]), colors = labels.map(k => MOOD_COLORS_MAP[k] || '#94a3b8');
       new Chart(moodDonutEl, {
         type: 'doughnut',

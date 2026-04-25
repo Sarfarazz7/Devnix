@@ -1815,23 +1815,6 @@ bodyInp.addEventListener('input', updateWC);
   let ghostText = '';
   let isLoadingAI = false;
 
-  const ghost = document.createElement('div');
-  ghost.style.cssText = `
-    position:absolute;pointer-events:none;color:var(--tx3);
-    opacity:0.5;font-family:inherit;font-size:inherit;
-    line-height:inherit;white-space:pre-wrap;word-wrap:break-word;
-    padding:inherit;margin:0;border:none;background:transparent;
-  `;
-  bodyInp.parentElement.style.position = 'relative';
-  bodyInp.parentElement.appendChild(ghost);
-
-  function updateGhost() {
-    const val = bodyInp.value;
-    if (!ghostText) { ghost.textContent = ''; return; }
-    ghost.textContent = val + ghostText;
-    ghost.style.width = bodyInp.offsetWidth + 'px';
-  }
-
   async function fetchCompletion() {
     const text = bodyInp.value.trim();
     if (!text || isLoadingAI) return;
@@ -1852,18 +1835,53 @@ bodyInp.addEventListener('input', updateWC);
         }
       );
       const data = await res.json();
-      ghostText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
-      if (bodyInp.value.endsWith(' ') && ghostText.startsWith(' ')) {
-        ghostText = ghostText.trimStart();
+      ghostText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+      if (ghostText) {
+        wc.textContent = '↵ Tab to accept: ' + ghostText.slice(0, 50) + (ghostText.length > 50 ? '…' : '');
+        wc.style.color = 'var(--p)';
+        wc.style.maxWidth = '70%';
+        wc.style.overflow = 'hidden';
+        wc.style.textOverflow = 'ellipsis';
+        wc.style.whiteSpace = 'nowrap';
+      } else {
+        updateWC();
       }
-      updateGhost();
     } catch (e) {
       ghostText = '';
+      updateWC();
     } finally {
       isLoadingAI = false;
-      updateWC();
     }
   }
+
+  bodyInp.addEventListener('keydown', async e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (ghostText) {
+        // Accept
+        bodyInp.value = bodyInp.value.trimEnd() + ' ' + ghostText;
+        ghostText = '';
+        wc.style.color = '';
+        wc.style.maxWidth = '';
+        updateWC();
+        toast('✨ AI suggestion accepted!');
+      } else {
+        await fetchCompletion();
+      }
+    } else if (e.key === 'Escape') {
+      ghostText = '';
+      wc.style.color = '';
+      wc.style.maxWidth = '';
+      updateWC();
+    } else {
+      if (ghostText) {
+        ghostText = '';
+        wc.style.color = '';
+        wc.style.maxWidth = '';
+        updateWC();
+      }
+    }
+  });
 
   bodyInp.addEventListener('keydown', async e => {
     if (e.key === 'Tab') {

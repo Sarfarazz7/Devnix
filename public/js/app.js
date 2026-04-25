@@ -1795,6 +1795,7 @@ function renderJournalAnalyticsPanel(journals) {
 }
 
 function renderJournalEditorForm(wrap) {
+  const GEMINI_KEY = 'YOUR_NEW_KEY_HERE';
   const isEdit = jState.mode === 'edit' && !!jState.editId;
   const journals = getJournals();
   const existing = isEdit ? journals.find(j => j.id === jState.editId) : null;
@@ -1807,6 +1808,86 @@ function renderJournalEditorForm(wrap) {
   bodyInp.addEventListener('input', updateWC);
   updateWC();
 
+bodyInp.addEventListener('input', updateWC);
+  updateWC();
+
+  // ── AI Tab Autocomplete ──────────────────────────────────
+  let ghostText = '';
+  let isLoadingAI = false;
+
+  const ghost = document.createElement('div');
+  ghost.style.cssText = `
+    position:absolute;pointer-events:none;color:var(--tx3);
+    opacity:0.5;font-family:inherit;font-size:inherit;
+    line-height:inherit;white-space:pre-wrap;word-wrap:break-word;
+    padding:inherit;margin:0;border:none;background:transparent;
+  `;
+  bodyInp.parentElement.style.position = 'relative';
+  bodyInp.parentElement.appendChild(ghost);
+
+  function updateGhost() {
+    const val = bodyInp.value;
+    if (!ghostText) { ghost.textContent = ''; return; }
+    ghost.textContent = val + ghostText;
+    ghost.style.width = bodyInp.offsetWidth + 'px';
+  }
+
+  async function fetchCompletion() {
+    const text = bodyInp.value.trim();
+    if (!text || isLoadingAI) return;
+    isLoadingAI = true;
+    wc.textContent = '✨ thinking…';
+    try {
+      const res = await fetch(
+        `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${GEMINI_KEY}`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ parts: [{ text:
+              `You are a journal writing assistant. Continue this journal entry naturally in the same tone and style. Return ONLY the continuation text (max 1-2 sentences). No explanations, no quotes.\n\nJournal so far:\n${text}`
+            }] }],
+            generationConfig: { maxOutputTokens: 60, temperature: 0.7 }
+          })
+        }
+      );
+      const data = await res.json();
+      ghostText = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+      if (bodyInp.value.endsWith(' ') && ghostText.startsWith(' ')) {
+        ghostText = ghostText.trimStart();
+      }
+      updateGhost();
+    } catch (e) {
+      ghostText = '';
+    } finally {
+      isLoadingAI = false;
+      updateWC();
+    }
+  }
+
+  bodyInp.addEventListener('keydown', async e => {
+    if (e.key === 'Tab') {
+      e.preventDefault();
+      if (ghostText) {
+        bodyInp.value += ghostText;
+        ghostText = '';
+        ghost.textContent = '';
+        updateWC();
+      } else {
+        await fetchCompletion();
+      }
+    } else if (e.key === 'Escape') {
+      ghostText = '';
+      ghost.textContent = '';
+      updateWC();
+    } else {
+      ghostText = '';
+      ghost.textContent = '';
+    }
+  });
+
+  wrap.querySelectorAll('.mood-btn').forEach(btn => {
+  
   wrap.querySelectorAll('.mood-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       jState.selMood = jState.selMood === btn.dataset.mood ? null : btn.dataset.mood;

@@ -1795,7 +1795,7 @@ function renderJournalAnalyticsPanel(journals) {
 }
 
 function renderJournalEditorForm(wrap) {
-  const GEMINI_KEY = 'AIzaSyAN0TlEFuCXNqsR1_v0cDnYVQTEpdOEKoQ';
+  const GEMINI_KEY = 'AIzaSyCVoXhEQ8nkqnKrK3EPrqaqcLV5PS0PoM0';
   const isEdit = jState.mode === 'edit' && !!jState.editId;
   const journals = getJournals();
   const existing = isEdit ? journals.find(j => j.id === jState.editId) : null;

@@ -960,7 +960,7 @@ function refreshAnalyticsCharts(txns) {
   const catMap = {};
   txns.filter(t => t.type === 'expense').forEach(t => { catMap[t.cat] = (catMap[t.cat] || 0) + Math.abs(t.amt); });
   const budgets = getBudgets();
-  const catKeys = Object.keys(catMap).length ? Object.keys(catMap) : Object.keys(budgets);
+  const catKeys = [...new Set([...Object.keys(catMap), ...Object.keys(budgets)])];
   const totalExp = catKeys.reduce((s, k) => s + (catMap[k] || 0), 0);
   const catListEl = document.getElementById('catList2');
   if (catListEl) {

@@ -1678,41 +1678,32 @@ function renderJournalAnalyticsPanel(journals) {
     return wrap;
   }
 
-  // ── Compute stats ──────────────────────────────────────
   const totalWords = journals.reduce((s, j) => s + ((j.body || '').split(/\s+/).filter(Boolean).length), 0);
   const avgWords = Math.round(totalWords / journals.length);
   const moodCounts = {};
   journals.filter(j => j.mood).forEach(j => { moodCounts[j.mood] = (moodCounts[j.mood] || 0) + 1; });
-  const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
-  let streak = 0, longestStreak = 0, cur = 0;
   const dateSet = new Set(journals.map(j => j.date));
+  let streak = 0, longestStreak = 0, cur = 0;
   for (let i = 0; i < 365; i++) {
     const d = dStr(addD(new Date(), -i));
-    if (dateSet.has(d)) { streak++; } else if (i > 0) break;
+    if (dateSet.has(d)) streak++; else if (i > 0) break;
   }
   const sortedDates = [...dateSet].sort();
   for (let i = 0; i < sortedDates.length; i++) {
     if (i === 0) { cur = 1; }
     else {
-      const prev = new Date(sortedDates[i-1] + 'T12:00:00');
-      const curr = new Date(sortedDates[i] + 'T12:00:00');
-      const diff = Math.round((curr - prev) / 86400000);
+      const diff = Math.round((new Date(sortedDates[i] + 'T12:00:00') - new Date(sortedDates[i-1] + 'T12:00:00')) / 86400000);
       cur = diff === 1 ? cur + 1 : 1;
     }
     longestStreak = Math.max(longestStreak, cur);
   }
-  const thisMonth = journals.filter(j => {
-    const d = new Date(j.date + 'T12:00:00'), n = new Date();
-    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
-  }).length;
 
   const MOOD_COLORS_MAP = {
     '😊': '#22c55e', '😌': '#06b6d4', '🔥': '#f97316',
     '😔': '#64748b', '😤': '#ef4444', '😴': '#94a3b8',
-    '🤔': '#8b5cf6', '🎉': '#fbbf24',
-    '😄': '#16a34a', '🤩': '#10b981', '🙂': '#86efac',
-    '😐': '#cbd5e1', '😞': '#fb923c', '😢': '#dc2626',
-    '😡': '#b91c1c', '😰': '#7c3aed'
+    '🤔': '#8b5cf6', '🎉': '#fbbf24', '😄': '#16a34a',
+    '🤩': '#10b981', '🙂': '#86efac', '😐': '#cbd5e1',
+    '😞': '#fb923c', '😢': '#dc2626', '😡': '#b91c1c', '😰': '#7c3aed'
   };
   const MOOD_SCORE = {
     '😊': 5, '😌': 4, '🔥': 5, '😔': 2, '😤': 1,
@@ -1720,12 +1711,11 @@ function renderJournalAnalyticsPanel(journals) {
     '🙂': 4, '😐': 3, '😞': 2, '😢': 1, '😡': 1, '😰': 2
   };
 
-  const tcC = () => isDk() ? '#6b7280' : '#9ca3af';
-  const gcC = () => isDk() ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.04)';
-  const cardBg = isDk() ? '#13161f' : '#f8fafc';
-  const cardBorder = isDk() ? '#1e2333' : '#e2e8f0';
+  const tc = () => isDk() ? '#6b7280' : '#9ca3af';
+  const gc = () => isDk() ? 'rgba(255,255,255,.05)' : 'rgba(0,0,0,.04)';
+  const cb = isDk() ? '#13161f' : '#f8fafc';
+  const cbr = isDk() ? '#1e2333' : '#e2e8f0';
 
-  // ── KPI Row ─────────────────────────────────────────────
   wrap.innerHTML = `
   <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
     ${[
@@ -1734,169 +1724,307 @@ function renderJournalAnalyticsPanel(journals) {
       { icon: '🏆', val: longestStreak + ' days', lbl: 'Longest streak', color: '#fbbf24' },
       { icon: '📝', val: avgWords, lbl: 'Avg words/entry', color: '#06b6d4' },
     ].map((k, i) => `
-      <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:16px;animation:fadeUp .4s ease both;animation-delay:${i*60}ms">
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:16px;animation:fadeUp .4s ease both;animation-delay:${i*60}ms">
         <div style="font-size:22px;margin-bottom:6px">${k.icon}</div>
         <div style="font-size:22px;font-weight:800;color:${k.color};line-height:1">${k.val}</div>
         <div style="font-size:11px;color:var(--tx3);margin-top:4px">${k.lbl}</div>
       </div>`).join('')}
   </div>
 
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
-    <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px">
-      <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">📈 MOOD TREND</div>
-      <div style="position:relative;height:160px"><canvas id="janMoodLine"></canvas></div>
+  <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:18px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:4px;letter-spacing:.5px">📈 MOOD OVER TIME
+      <span style="font-weight:400;color:var(--tx3);font-size:11px;margin-left:6px">bars = mood score · line = 3-entry rolling avg</span>
     </div>
-    <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px">
-      <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">🎭 MOOD SPLIT</div>
-      <div style="display:flex;align-items:center;gap:16px">
-        <div style="position:relative;height:140px;width:140px;flex-shrink:0"><canvas id="janMoodDonut"></canvas></div>
-        <div id="janMoodLegend" style="flex:1;display:flex;flex-direction:column;gap:5px;font-size:11px"></div>
+    <div style="position:relative;height:200px"><canvas id="janMoodCombo"></canvas></div>
+  </div>
+
+  <div style="display:grid;grid-template-columns:1.2fr 1fr;gap:12px;margin-bottom:12px">
+    <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:4px;letter-spacing:.5px">📅 WRITING FREQUENCY
+        <span style="font-weight:400;color:var(--tx3);font-size:11px;margin-left:4px">bars + cumulative %</span>
+      </div>
+      <div style="position:relative;height:180px"><canvas id="janPareto"></canvas></div>
+    </div>
+    <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:4px;letter-spacing:.5px">🎭 MOOD SPLIT</div>
+      <div style="display:flex;align-items:center;gap:12px;height:180px">
+        <div style="position:relative;flex:1;height:100%"><canvas id="janMoodPie"></canvas></div>
+        <div id="janPieLegend" style="display:flex;flex-direction:column;gap:4px;font-size:10px;min-width:80px"></div>
       </div>
     </div>
   </div>
 
-  <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px;margin-bottom:12px">
-    <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">📅 WRITING CONSISTENCY <span style="font-weight:400;color:var(--tx3);font-size:11px">(last 84 days)</span></div>
-    <div id="janHeatmap" style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px"></div>
-    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--tx3)">
-      <span>12 weeks ago</span><span>Today</span>
+  <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:18px">
+    <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:4px;letter-spacing:.5px">✍ WORDS PER ENTRY
+      <span style="font-weight:400;color:var(--tx3);font-size:11px;margin-left:6px">bars = words · line = average</span>
     </div>
-  </div>
-
-  <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px">
-    <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">✍ WORDS PER ENTRY <span style="font-weight:400;color:var(--tx3);font-size:11px">(last 10 entries)</span></div>
-    <div style="position:relative;height:140px"><canvas id="janWordsBar"></canvas></div>
+    <div style="position:relative;height:160px"><canvas id="janWordsCombo"></canvas></div>
   </div>`;
 
-  // ── Charts ───────────────────────────────────────────────
   requestAnimationFrame(() => {
-    // Mood line
+
+    // ── 1. Mood Combo (bars + rolling avg line) ─────────────
     const moodEntries = journals
       .filter(j => j.mood && MOOD_SCORE[j.mood] !== undefined)
       .sort((a, b) => a.date.localeCompare(b.date))
       .slice(-20);
 
-    const moodLineEl = document.getElementById('janMoodLine');
-    if (moodLineEl) {
+    const moodComboEl = document.getElementById('janMoodCombo');
+    if (moodComboEl) {
       if (moodEntries.length >= 2) {
-        const ptColors = moodEntries.map(e => MOOD_COLORS_MAP[e.mood] || '#8b5cf6');
-        new Chart(moodLineEl, {
-          type: 'line',
+        const scores = moodEntries.map(e => MOOD_SCORE[e.mood] || 3);
+        const rolling = scores.map((_, i) => {
+          const sl = scores.slice(Math.max(0, i - 2), i + 3);
+          return +(sl.reduce((a, b) => a + b, 0) / sl.length).toFixed(2);
+        });
+        const barColors = moodEntries.map(e => MOOD_COLORS_MAP[e.mood] || '#8b5cf6');
+        new Chart(moodComboEl, {
           data: {
             labels: moodEntries.map(e => {
               const d = new Date(e.date + 'T12:00:00');
               return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
             }),
-            datasets: [{
-              data: moodEntries.map(e => MOOD_SCORE[e.mood] || 3),
-              borderColor: '#8b5cf6',
-              backgroundColor: 'rgba(139,92,246,0.08)',
-              borderWidth: 2.5, fill: true, tension: 0.4,
-              pointRadius: 6, pointBackgroundColor: ptColors,
-              pointBorderColor: isDk() ? '#13161f' : '#fff',
-              pointBorderWidth: 2
-            }]
+            datasets: [
+              {
+                type: 'bar',
+                label: 'Mood score',
+                data: scores,
+                backgroundColor: barColors.map(c => c + 'bb'),
+                borderColor: barColors,
+                borderWidth: 1.5,
+                borderRadius: 5,
+                borderSkipped: false,
+                yAxisID: 'y',
+                order: 2
+              },
+              {
+                type: 'line',
+                label: '3-entry avg',
+                data: rolling,
+                borderColor: '#f97316',
+                backgroundColor: 'rgba(249,115,22,0.08)',
+                borderWidth: 2.5,
+                pointRadius: 4,
+                pointBackgroundColor: '#f97316',
+                pointBorderColor: isDk() ? '#13161f' : '#fff',
+                pointBorderWidth: 2,
+                tension: 0.4,
+                fill: false,
+                yAxisID: 'y',
+                order: 1
+              }
+            ]
           },
           options: {
             responsive: true, maintainAspectRatio: false,
             animation: { duration: 900, easing: 'easeOutQuart' },
             plugins: {
-              legend: { display: false },
-              tooltip: { callbacks: { label: c => {
-                const e = moodEntries[c.dataIndex];
-                const lbl = { 1:'Very low',2:'Low',3:'Neutral',4:'Good',5:'Happy',6:'Excited',7:'Excellent' };
-                return e.mood + '  ' + (lbl[c.parsed.y] || 'Neutral');
-              }}}
+              legend: {
+                display: true,
+                position: 'top',
+                align: 'end',
+                labels: { color: tc(), font: { size: 10 }, boxWidth: 12, padding: 10 }
+              },
+              tooltip: { callbacks: {
+                label: c => {
+                  if (c.datasetIndex === 0) {
+                    const e = moodEntries[c.dataIndex];
+                    const lbl = {1:'Very low',2:'Low',3:'Neutral',4:'Good',5:'Happy',6:'Excited',7:'Excellent'};
+                    return e.mood + ' ' + (lbl[c.parsed.y] || '');
+                  }
+                  return 'Avg: ' + c.parsed.y;
+                }
+              }}
             },
             scales: {
-              y: { min: 1, max: 7, ticks: { stepSize: 2, font: { size: 10 }, color: tcC(),
-                callback: v => (['','😢','','😐','','😊','','🤩'][v] || '') }, grid: { color: gcC() } },
-              x: { ticks: { font: { size: 9 }, color: tcC(), maxTicksLimit: 8 }, grid: { display: false } }
+              y: {
+                min: 0, max: 7,
+                ticks: { stepSize: 1, font: { size: 10 }, color: tc(),
+                  callback: v => (['','😢','😞','😐','🙂','😊','😄','🤩'][v] || '') },
+                grid: { color: gc() }
+              },
+              x: { ticks: { font: { size: 9 }, color: tc(), maxTicksLimit: 10 }, grid: { display: false } }
             }
           }
         });
       } else {
-        moodLineEl.parentElement.innerHTML = `<div style="height:160px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px;text-align:center">Add mood to at least<br>2 entries to see trend</div>`;
+        moodComboEl.parentElement.innerHTML = `<div style="height:200px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px;text-align:center">Add mood to at least 2 entries<br>to see the trend</div>`;
       }
     }
 
-    // Mood donut
-    const moodDonutEl = document.getElementById('janMoodDonut');
-    if (moodDonutEl && Object.keys(moodCounts).length) {
-      const labels = Object.keys(moodCounts);
-      const data = labels.map(k => moodCounts[k]);
-      const colors = labels.map(k => MOOD_COLORS_MAP[k] || '#94a3b8');
-      new Chart(moodDonutEl, {
-        type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 3,
-          borderColor: isDk() ? '#13161f' : '#ffffff', hoverOffset: 6 }] },
-        options: {
-          responsive: true, maintainAspectRatio: false, cutout: '68%',
-          animation: { duration: 800 },
-          plugins: { legend: { display: false }, tooltip: { callbacks: {
-            label: c => c.label + '  ' + c.parsed + ' entries'
-          }}}
-        }
-      });
-      const total = data.reduce((a, b) => a + b, 0);
-      const legendEl = document.getElementById('janMoodLegend');
-      if (legendEl) legendEl.innerHTML = labels.map((l, i) =>
-        `<div style="display:flex;align-items:center;gap:6px">
-          <span style="width:8px;height:8px;border-radius:50%;background:${colors[i]};flex-shrink:0"></span>
-          <span style="color:var(--tx2)">${l}</span>
-          <span style="color:var(--tx3);margin-left:auto">${Math.round(data[i]/total*100)}%</span>
-        </div>`).join('');
-    } else if (moodDonutEl) {
-      moodDonutEl.parentElement.innerHTML = `<div style="height:140px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px">No mood data yet</div>`;
-    }
-
-    // Heatmap
-    const heatEl = document.getElementById('janHeatmap');
-    if (heatEl) {
-      heatEl.innerHTML = '';
-      for (let i = 83; i >= 0; i--) {
-        const d = dStr(addD(new Date(), -i));
-        const has = dateSet.has(d);
-        const dt = new Date(d + 'T12:00:00');
-        const cell = document.createElement('div');
-        cell.title = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (has ? ' ✓ wrote' : '');
-        cell.style.cssText = `
-          aspect-ratio:1;border-radius:4px;cursor:default;transition:transform .15s;
-          background:${has ? '#8b5cf6' : (isDk() ? '#1e2333' : '#e2e8f0')};
-          ${has ? 'box-shadow:0 0 6px rgba(139,92,246,.4)' : ''}
-        `;
-        if (has) cell.addEventListener('mouseenter', () => cell.style.transform = 'scale(1.2)');
-        cell.addEventListener('mouseleave', () => cell.style.transform = '');
-        heatEl.appendChild(cell);
+    // ── 2. Pareto: Writing Frequency ────────────────────────
+    const paretoEl = document.getElementById('janPareto');
+    if (paretoEl) {
+      // Count entries per week (last 12 weeks)
+      const weekCounts = [];
+      const weekLabels = [];
+      for (let w = 11; w >= 0; w--) {
+        const wStart = dStr(addD(new Date(), -(w * 7 + 6)));
+        const wEnd   = dStr(addD(new Date(), -(w * 7)));
+        const cnt = journals.filter(j => j.date >= wStart && j.date <= wEnd).length;
+        weekCounts.push(cnt);
+        const d = new Date(wEnd + 'T12:00:00');
+        weekLabels.push('W' + (12 - w));
       }
-    }
+      const total = weekCounts.reduce((a, b) => a + b, 0) || 1;
+      let cumSum = 0;
+      const cumPct = weekCounts.map(c => { cumSum += c; return Math.round(cumSum / total * 100); });
+      const barBg = weekCounts.map(c => c === 0 ? (isDk() ? '#1e2333' : '#e2e8f0') : '#8b5cf6bb');
+      const barBorder = weekCounts.map(c => c === 0 ? (isDk() ? '#2a3047' : '#d1d5db') : '#8b5cf6');
 
-    // Words bar
-    const wordsEl = document.getElementById('janWordsBar');
-    if (wordsEl) {
-      const last10 = [...journals].sort((a, b) => a.date.localeCompare(b.date)).slice(-10);
-      const wCounts = last10.map(j => (j.body || '').split(/\s+/).filter(Boolean).length);
-      const barColors = wCounts.map(w => w > 300 ? '#8b5cf6' : w > 150 ? '#06b6d4' : w > 50 ? '#22c55e' : '#94a3b8');
-      new Chart(wordsEl, {
-        type: 'bar',
+      new Chart(paretoEl, {
         data: {
-          labels: last10.map(j => {
-            const d = new Date(j.date + 'T12:00:00');
-            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
-          }),
-          datasets: [{ data: wCounts, backgroundColor: barColors, borderRadius: 6, borderSkipped: false }]
+          labels: weekLabels,
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Entries',
+              data: weekCounts,
+              backgroundColor: barBg,
+              borderColor: barBorder,
+              borderWidth: 1.5,
+              borderRadius: 4,
+              borderSkipped: false,
+              yAxisID: 'y',
+              order: 2
+            },
+            {
+              type: 'line',
+              label: 'Cumulative %',
+              data: cumPct,
+              borderColor: '#06b6d4',
+              backgroundColor: 'rgba(6,182,212,0.06)',
+              borderWidth: 2,
+              borderDash: [5, 3],
+              pointRadius: 3,
+              pointBackgroundColor: '#06b6d4',
+              tension: 0.3,
+              fill: false,
+              yAxisID: 'y1',
+              order: 1
+            }
+          ]
         },
         options: {
           responsive: true, maintainAspectRatio: false,
-          animation: { duration: 700 },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + ' words' } } },
+          animation: { duration: 800 },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: c => c.datasetIndex === 0
+                ? c.parsed.y + ' entries'
+                : 'Cumulative: ' + c.parsed.y + '%'
+            }}
+          },
           scales: {
-            y: { ticks: { font: { size: 10 }, color: tcC() }, grid: { color: gcC() } },
-            x: { ticks: { font: { size: 9 }, color: tcC() }, grid: { display: false } }
+            y: { min: 0, ticks: { font: { size: 10 }, color: tc(), stepSize: 1 }, grid: { color: gc() } },
+            y1: {
+              position: 'right',
+              min: 0, max: 100,
+              ticks: { font: { size: 9 }, color: '#06b6d4', callback: v => v + '%' },
+              grid: { display: false }
+            },
+            x: { ticks: { font: { size: 9 }, color: tc() }, grid: { display: false } }
           }
         }
       });
     }
+
+    // ── 3. Mood Pie ─────────────────────────────────────────
+    const piEl = document.getElementById('janMoodPie');
+    if (piEl && Object.keys(moodCounts).length) {
+      const labels = Object.keys(moodCounts);
+      const data   = labels.map(k => moodCounts[k]);
+      const colors = labels.map(k => MOOD_COLORS_MAP[k] || '#94a3b8');
+      new Chart(piEl, {
+        type: 'pie',
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2,
+          borderColor: isDk() ? '#13161f' : '#fff', hoverOffset: 8 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 700 },
+          plugins: {
+            legend: { display: false },
+            tooltip: { callbacks: {
+              label: c => c.label + '  ' + Math.round(c.parsed / data.reduce((a,b)=>a+b,0) * 100) + '%'
+            }}
+          }
+        }
+      });
+      const legendEl = document.getElementById('janPieLegend');
+      const tot = data.reduce((a, b) => a + b, 0);
+      if (legendEl) legendEl.innerHTML = labels.map((l, i) =>
+        `<div style="display:flex;align-items:center;gap:5px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colors[i]};flex-shrink:0"></span>
+          <span style="color:var(--tx2);font-size:11px">${l} <span style="color:var(--tx3)">${Math.round(data[i]/tot*100)}%</span></span>
+        </div>`).join('');
+    } else if (piEl) {
+      piEl.parentElement.innerHTML = `<div style="display:flex;align-items:center;justify-content:center;height:100%;color:var(--tx3);font-size:12px">No mood data</div>`;
+    }
+
+    // ── 4. Words Combo (bars + avg line) ────────────────────
+    const wordsEl = document.getElementById('janWordsCombo');
+    if (wordsEl) {
+      const last12 = [...journals].sort((a, b) => a.date.localeCompare(b.date)).slice(-12);
+      const wCounts = last12.map(j => (j.body || '').split(/\s+/).filter(Boolean).length);
+      const wAvg = Math.round(wCounts.reduce((a, b) => a + b, 0) / (wCounts.length || 1));
+      const avgLine = wCounts.map(() => wAvg);
+      const barColors = wCounts.map(w => w > 300 ? '#8b5cf6' : w > 150 ? '#06b6d4' : w > 50 ? '#22c55e' : '#94a3b8');
+
+      new Chart(wordsEl, {
+        data: {
+          labels: last12.map(j => {
+            const d = new Date(j.date + 'T12:00:00');
+            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+          }),
+          datasets: [
+            {
+              type: 'bar',
+              label: 'Words',
+              data: wCounts,
+              backgroundColor: barColors.map(c => c + 'cc'),
+              borderColor: barColors,
+              borderWidth: 1.5,
+              borderRadius: 5,
+              borderSkipped: false,
+              yAxisID: 'y',
+              order: 2
+            },
+            {
+              type: 'line',
+              label: 'Average',
+              data: avgLine,
+              borderColor: '#f97316',
+              borderWidth: 2,
+              borderDash: [6, 3],
+              pointRadius: 0,
+              tension: 0,
+              fill: false,
+              yAxisID: 'y',
+              order: 1
+            }
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 700 },
+          plugins: {
+            legend: {
+              display: true, position: 'top', align: 'end',
+              labels: { color: tc(), font: { size: 10 }, boxWidth: 12, padding: 10 }
+            },
+            tooltip: { callbacks: {
+              label: c => c.datasetIndex === 0 ? c.parsed.y + ' words' : 'Avg: ' + c.parsed.y + ' words'
+            }}
+          },
+          scales: {
+            y: { ticks: { font: { size: 10 }, color: tc() }, grid: { color: gc() } },
+            x: { ticks: { font: { size: 9 }, color: tc() }, grid: { display: false } }
+          }
+        }
+      });
+    }
+
   });
 
   return wrap;

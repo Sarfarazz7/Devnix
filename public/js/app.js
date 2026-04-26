@@ -705,63 +705,80 @@ function renderProfile() {
   if (!u) return;
  
   const em   = u.email || '';
-  const name = em.split('@')[0] || '?';
-  const initials = (name[0] || '?').toUpperCase();
+  // Use saved display name or fall back to email prefix
+  const savedName = u.displayName || em.split('@')[0] || '?';
+  const initials  = (savedName[0] || '?').toUpperCase();
+  const savedPhoto = u.photoURL || null; // base64 or null
  
-  /* ── Stats calculation ── */
+  /* ── Stats ── */
   const td = today();
   let streak = 0;
   for (let i = 0; i < 120; i++) {
     const d = dStr(addD(new Date(), -i));
-    if ((u.tasks || []).length && (u.tasks || []).every(t => u.done[t.id + '_' + d])) streak++;
+    if ((u.tasks||[]).length && (u.tasks||[]).every(t => u.done[t.id+'_'+d])) streak++;
     else if (i > 0) break;
   }
-  const todayP = (u.tasks || []).length
-    ? Math.round((u.tasks || []).filter(t => u.done[t.id + '_' + td]).length / (u.tasks || []).length * 100)
+  const todayP = (u.tasks||[]).length
+    ? Math.round((u.tasks||[]).filter(t => u.done[t.id+'_'+td]).length / (u.tasks||[]).length * 100)
     : 0;
- 
-  const totalWords = (u.journals || []).reduce((s, j) =>
-    s + ((j.body || '').split(/\s+/).filter(Boolean).length), 0);
- 
+  const totalWords = (u.journals||[]).reduce((s,j) =>
+    s + ((j.body||'').split(/\s+/).filter(Boolean).length), 0);
   let journalStreak = 0;
   for (let i = 0; i < 60; i++) {
     const d = dStr(addD(new Date(), -i));
-    if ((u.journals || []).some(j => j.date === d)) journalStreak++;
+    if ((u.journals||[]).some(j => j.date === d)) journalStreak++;
     else if (i > 0) break;
   }
- 
   const { inc, exp, net } = calcTotals(u.transactions || []);
  
-  /* ── Render into #profileCardRoot ── */
+  /* ── Root ── */
   const root = document.getElementById('profileCardRoot');
   if (!root) return;
  
+  // Avatar: photo or initials
+  const avatarHTML = savedPhoto
+    ? `<img src="${savedPhoto}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;"/>`
+    : initials;
+ 
   root.innerHTML = `
-    <!-- ── Cover + Avatar ── -->
+    <!-- Cover -->
     <div class="prf-cover">
       <div class="prf-cover-gradient"></div>
     </div>
  
+    <!-- Identity row — FIXED: cover ends, then avatar+name below -->
     <div class="prf-identity">
-      <div class="prf-av-wrap">
-        <div class="p-av" id="pAv">${initials}</div>
-        <div class="prf-online-dot" title="Online"></div>
+      <div class="prf-av-wrap" id="prfAvWrap" title="Change photo">
+        <div class="p-av" id="pAv" style="overflow:hidden;cursor:pointer">${avatarHTML}</div>
+        <div class="prf-online-dot"></div>
+        <div class="prf-av-overlay">📷</div>
+        <input type="file" id="prfPhotoInput" accept="image/*" style="display:none"/>
       </div>
-      <div>
-        <div class="p-name" id="pName">${escHtml(name)}</div>
+      <div class="prf-identity-text">
+        <div class="prf-name-row">
+          <div class="p-name" id="pName">${escHtml(savedName)}</div>
+          <button class="prf-edit-name-btn" id="prfEditNameBtn" title="Edit name">✏️</button>
+        </div>
         <div class="p-email" id="pEmail">${escHtml(em)}</div>
       </div>
     </div>
  
-    <!-- ── Main stats grid ── -->
+    <!-- Inline name editor (hidden by default) -->
+    <div class="prf-name-editor H" id="prfNameEditor">
+      <input class="prf-name-input" id="prfNameInput" type="text" placeholder="Your display name" maxlength="32" value="${escHtml(savedName)}"/>
+      <button class="prf-name-save" id="prfNameSave">Save</button>
+      <button class="prf-name-cancel" id="prfNameCancel">✕</button>
+    </div>
+ 
+    <!-- Stats grid -->
     <div class="prf-stats-grid" id="pStats">
       ${[
-        { val: (u.tasks || []).length,          label: 'Tasks',       color: 'var(--p)'    },
-        { val: streak,                           label: 'Day streak',  color: 'var(--ambm)' },
-        { val: todayP + '%',                     label: 'Today',       color: 'var(--blumid)'},
-        { val: (u.transactions || []).length,    label: 'Transactions',color: 'var(--purmid)'},
-        { val: Object.keys(u.done).length,       label: 'Check-ins',   color: 'var(--telmid)'},
-        { val: (u.journals || []).length,        label: 'Journals',    color: 'var(--grnmid)'},
+        { val: (u.tasks||[]).length,           label: 'Tasks',        color: 'var(--p)'     },
+        { val: streak,                          label: 'Day streak',   color: 'var(--ambm)'  },
+        { val: todayP + '%',                   label: 'Today',        color: 'var(--blumid)'},
+        { val: (u.transactions||[]).length,    label: 'Transactions', color: 'var(--purmid)'},
+        { val: Object.keys(u.done).length,     label: 'Check-ins',    color: 'var(--telmid)'},
+        { val: (u.journals||[]).length,        label: 'Journals',     color: 'var(--grnmid)'},
       ].map(s => `
         <div class="prf-stat">
           <div class="prf-stat-val" style="color:${s.color}">${s.val}</div>
@@ -769,7 +786,7 @@ function renderProfile() {
         </div>`).join('')}
     </div>
  
-    <!-- ── Progress bar: today ── -->
+    <!-- Progress bar -->
     <div class="prf-section">
       <div class="prf-section-label">Today's progress</div>
       <div class="prf-progress-wrap">
@@ -780,7 +797,7 @@ function renderProfile() {
       </div>
     </div>
  
-    <!-- ── Extended stats row ── -->
+    <!-- Extended stats -->
     <div class="prf-extended-row">
       <div class="prf-ext-card">
         <div class="prf-ext-icon">📔</div>
@@ -793,7 +810,7 @@ function renderProfile() {
         <div class="prf-ext-lbl">Words written</div>
       </div>
       <div class="prf-ext-card">
-        <div class="prf-ext-icon" style="color:${net>=0?'var(--grnmid)':'var(--redm)'}">💰</div>
+        <div class="prf-ext-icon">💰</div>
         <div class="prf-ext-val" style="color:${net>=0?'var(--grnmid)':'var(--redm)'}">${fmtCurrency(net)}</div>
         <div class="prf-ext-lbl">Net savings</div>
       </div>
@@ -804,7 +821,7 @@ function renderProfile() {
       </div>
     </div>
  
-    <!-- ── Weekly heatmap ── -->
+    <!-- 7-day heatmap -->
     <div class="prf-section">
       <div class="prf-section-label">Last 7 days</div>
       <div class="prf-week-hm">
@@ -812,8 +829,7 @@ function renderProfile() {
           const d = dStr(addD(new Date(), -(6 - i)));
           const tasks = u.tasks || [];
           const done = tasks.length
-            ? tasks.filter(t => u.done[t.id + '_' + d]).length / tasks.length
-            : 0;
+            ? tasks.filter(t => u.done[t.id+'_'+d]).length / tasks.length : 0;
           const lvl = done === 0 ? 0 : done < 0.5 ? 1 : done < 1 ? 2 : 3;
           const colors = ['var(--bd)','#a5d6a7','#66bb6a','#2e7d32'];
           return `<div class="prf-hm-day">
@@ -824,7 +840,7 @@ function renderProfile() {
       </div>
     </div>
  
-    <!-- ── Actions ── -->
+    <!-- Actions -->
     <div class="prf-section">
       <div class="prf-section-label">Quick actions</div>
       <div class="p-actions">
@@ -846,18 +862,16 @@ function renderProfile() {
       </div>
     </div>
  
-    <!-- ── Danger zone ── -->
+    <!-- Danger -->
     <div class="prf-section">
       <div class="prf-section-label" style="color:var(--red)">Account</div>
       <div class="p-actions">
-        <button class="prf-action-btn prf-danger" id="pOut">
-          Sign out of this device
-        </button>
+        <button class="prf-action-btn prf-danger" id="pOut">Sign out of this device</button>
       </div>
     </div>
   `;
  
-  /* ── Inline styles for new profile elements (injected once) ── */
+  /* ── Inject styles once ── */
   if (!document.getElementById('prf-styles')) {
     const style = document.createElement('style');
     style.id = 'prf-styles';
@@ -865,37 +879,127 @@ function renderProfile() {
       /* Cover */
       .prf-cover {
         margin: -28px -28px 0;
-        height: 80px;
+        height: 90px;
         background: linear-gradient(135deg, var(--p) 0%, var(--blumid) 100%);
         border-radius: 14px 14px 0 0;
         position: relative;
         overflow: hidden;
+        flex-shrink: 0;
       }
       .prf-cover-gradient {
         position: absolute; inset: 0;
         background: repeating-linear-gradient(
-          45deg,
-          transparent,
-          transparent 10px,
-          rgba(255,255,255,.04) 10px,
-          rgba(255,255,255,.04) 20px
+          45deg, transparent, transparent 10px,
+          rgba(255,255,255,.05) 10px, rgba(255,255,255,.05) 20px
         );
       }
-      /* Identity row */
+ 
+      /* Identity: sits BELOW the cover, not overlapping */
       .prf-identity {
         display: flex;
-        align-items: flex-end;
+        align-items: center;
         gap: 14px;
-        margin-top: -28px;
+        padding-top: 12px;
         margin-bottom: 18px;
       }
-      .prf-av-wrap { position: relative; flex-shrink: 0; }
+      .prf-identity-text {
+        display: flex;
+        flex-direction: column;
+        gap: 3px;
+        min-width: 0;
+      }
+      .prf-name-row {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .p-name {
+        font-size: 18px;
+        font-weight: 700;
+        color: var(--tx);
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .prf-edit-name-btn {
+        background: none;
+        border: none;
+        cursor: pointer;
+        font-size: 14px;
+        padding: 2px 4px;
+        border-radius: 5px;
+        opacity: 0.5;
+        transition: opacity .18s, background .18s;
+        flex-shrink: 0;
+        line-height: 1;
+      }
+      .prf-edit-name-btn:hover { opacity: 1; background: var(--sf2); }
+ 
+      /* Avatar */
+      .prf-av-wrap {
+        position: relative;
+        flex-shrink: 0;
+        cursor: pointer;
+      }
+      .prf-av-wrap:hover .prf-av-overlay { opacity: 1; }
+      .prf-av-overlay {
+        position: absolute; inset: 0;
+        border-radius: 50%;
+        background: rgba(0,0,0,.45);
+        display: flex; align-items: center; justify-content: center;
+        font-size: 18px;
+        opacity: 0;
+        transition: opacity .2s;
+      }
       .prf-online-dot {
         position: absolute; bottom: 2px; right: 2px;
         width: 12px; height: 12px; border-radius: 50%;
         background: var(--pm);
         border: 2px solid var(--sf);
+        z-index: 2;
       }
+ 
+      /* Name editor */
+      .prf-name-editor {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        margin: -10px 0 14px;
+        animation: fadeUp .2s ease;
+      }
+      .prf-name-editor.H { display: none !important; }
+      .prf-name-input {
+        flex: 1;
+        height: 36px;
+        padding: 0 12px;
+        border: 1.5px solid var(--p);
+        border-radius: 9px;
+        background: var(--sf2);
+        color: var(--tx);
+        font-size: 14px;
+        font-family: inherit;
+        outline: none;
+      }
+      .prf-name-save {
+        height: 36px; padding: 0 16px;
+        background: var(--p); color: #fff;
+        border: none; border-radius: 9px;
+        font-size: 13px; font-weight: 600;
+        cursor: pointer; font-family: inherit;
+        transition: background .18s;
+      }
+      .prf-name-save:hover { background: var(--ph); }
+      .prf-name-cancel {
+        height: 36px; width: 36px;
+        background: var(--sf2);
+        border: 1px solid var(--bd);
+        border-radius: 9px;
+        font-size: 14px; cursor: pointer;
+        color: var(--tx2);
+        transition: background .18s;
+      }
+      .prf-name-cancel:hover { background: var(--sf3); }
+ 
       /* Stats grid */
       .prf-stats-grid {
         display: grid;
@@ -904,49 +1008,50 @@ function renderProfile() {
         margin-bottom: 16px;
       }
       .prf-stat {
-        background: var(--sf2);
-        border-radius: 10px;
-        padding: 12px 8px;
-        text-align: center;
+        background: var(--sf2); border-radius: 10px;
+        padding: 12px 8px; text-align: center;
         transition: transform .18s, box-shadow .18s;
       }
       .prf-stat:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
       .prf-stat-val { font-size: 18px; font-weight: 800; }
       .prf-stat-lbl { font-size: 10px; color: var(--tx3); margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
-      /* Section label */
+ 
+      /* Section */
       .prf-section { margin-bottom: 14px; }
       .prf-section-label {
         font-size: 10px; font-weight: 700; color: var(--tx3);
-        text-transform: uppercase; letter-spacing: .08em;
-        margin-bottom: 8px;
+        text-transform: uppercase; letter-spacing: .08em; margin-bottom: 8px;
       }
+ 
       /* Progress */
       .prf-progress-wrap { display: flex; align-items: center; gap: 10px; }
       .prf-progress-bar { flex: 1; height: 8px; background: var(--bd); border-radius: 4px; overflow: hidden; }
       .prf-progress-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); }
       .prf-progress-pct { font-size: 12px; font-weight: 700; color: var(--tx2); min-width: 34px; text-align: right; }
+ 
       /* Extended row */
       .prf-extended-row {
         display: grid;
         grid-template-columns: repeat(4, 1fr);
-        gap: 8px;
-        margin-bottom: 16px;
+        gap: 8px; margin-bottom: 16px;
       }
       .prf-ext-card {
-        background: var(--sf2); border-radius: 10px; padding: 10px 8px;
-        text-align: center; border: 1px solid var(--bd);
-        transition: border-color .18s;
+        background: var(--sf2); border-radius: 10px;
+        padding: 10px 8px; text-align: center;
+        border: 1px solid var(--bd); transition: border-color .18s;
       }
       .prf-ext-card:hover { border-color: var(--bd2); }
       .prf-ext-icon { font-size: 18px; margin-bottom: 4px; }
       .prf-ext-val  { font-size: 14px; font-weight: 700; color: var(--tx); }
       .prf-ext-lbl  { font-size: 9px; color: var(--tx3); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
+ 
       /* Heatmap */
       .prf-week-hm { display: flex; gap: 6px; }
       .prf-hm-day  { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
-      .prf-hm-sq   { width: 100%; aspect-ratio: 1; border-radius: 4px; min-width: 24px; max-width: 40px; transition: transform .15s; }
+      .prf-hm-sq   { width: 100%; aspect-ratio: 1; border-radius: 4px; min-width: 24px; max-width: 40px; transition: transform .15s; cursor: default; }
       .prf-hm-sq:hover { transform: scale(1.2); }
       .prf-hm-lbl  { font-size: 9px; color: var(--tx3); }
+ 
       /* Action buttons */
       .prf-action-btn {
         width: 100%; height: 40px; text-align: left;
@@ -965,27 +1070,112 @@ function renderProfile() {
       .prf-danger { color: var(--red) !important; border-color: var(--redbg) !important; }
       .prf-danger:hover { background: var(--redbg) !important; }
  
-      /* ── Responsive overrides ── */
+      /* Responsive */
       @media (max-width: 767px) {
-        .prf-cover { margin: -20px -20px 0; }
+        .prf-cover { margin: -20px -20px 0; height: 70px; }
         .prf-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
         .prf-stat { padding: 10px 4px; }
         .prf-stat-val { font-size: 15px; }
         .prf-extended-row { grid-template-columns: repeat(2, 1fr); }
+        .prf-identity { gap: 10px; padding-top: 10px; }
+        .p-av { width: 52px !important; height: 52px !important; font-size: 20px !important; }
+        .p-name { font-size: 15px; }
         .prf-action-btn { font-size: 12px; }
-        .prf-identity { gap: 10px; }
-        .p-av { width: 52px !important; height: 52px !important; font-size: 20px !important; margin-bottom: 0; }
       }
       @media (max-width: 380px) {
         .prf-stats-grid { grid-template-columns: repeat(2, 1fr); }
         .prf-extended-row { grid-template-columns: repeat(2, 1fr); }
-        .prf-week-hm { gap: 3px; }
       }
     `;
     document.head.appendChild(style);
   }
  
-  /* ── Wire up buttons ── */
+  /* ── Photo upload ── */
+  const avWrap = document.getElementById('prfAvWrap');
+  const photoInput = document.getElementById('prfPhotoInput');
+  if (avWrap && photoInput) {
+    avWrap.addEventListener('click', () => photoInput.click());
+    photoInput.addEventListener('change', () => {
+      const file = photoInput.files[0];
+      if (!file) return;
+      if (file.size > 2 * 1024 * 1024) { toast('Image too large — max 2MB', 'warn'); return; }
+      const reader = new FileReader();
+      reader.onload = e => {
+        const base64 = e.target.result;
+        // Save to user object locally
+        S.user.photoURL = base64;
+        // Update avatar immediately
+        const av = document.getElementById('pAv');
+        if (av) av.innerHTML = `<img src="${base64}" alt="avatar" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;"/>`;
+        // Also update navbar avatar
+        const nbAv = document.getElementById('nbAv');
+        if (nbAv) {
+          nbAv.style.backgroundImage = `url(${base64})`;
+          nbAv.style.backgroundSize = 'cover';
+          nbAv.style.backgroundPosition = 'center';
+          nbAv.textContent = '';
+        }
+        toast('Photo updated! 📷');
+        // Persist to localStorage so it survives refresh
+        try { localStorage.setItem('devnix_photo_' + (S.user.email||''), base64); } catch(e) {}
+      };
+      reader.readAsDataURL(file);
+    });
+    // Restore photo from localStorage on load
+    try {
+      const saved = localStorage.getItem('devnix_photo_' + (S.user.email||''));
+      if (saved && !S.user.photoURL) {
+        S.user.photoURL = saved;
+        const av = document.getElementById('pAv');
+        if (av) av.innerHTML = `<img src="${saved}" style="width:100%;height:100%;object-fit:cover;border-radius:50%;display:block;"/>`;
+        const nbAv = document.getElementById('nbAv');
+        if (nbAv) { nbAv.style.backgroundImage = `url(${saved})`; nbAv.style.backgroundSize='cover'; nbAv.style.backgroundPosition='center'; nbAv.textContent=''; }
+      }
+    } catch(e) {}
+  }
+ 
+  /* ── Edit name ── */
+  const editBtn    = document.getElementById('prfEditNameBtn');
+  const nameEditor = document.getElementById('prfNameEditor');
+  const nameInput  = document.getElementById('prfNameInput');
+  const nameSave   = document.getElementById('prfNameSave');
+  const nameCancel = document.getElementById('prfNameCancel');
+ 
+  if (editBtn) editBtn.addEventListener('click', () => {
+    nameEditor.classList.remove('H');
+    nameInput.focus();
+    nameInput.select();
+  });
+ 
+  if (nameCancel) nameCancel.addEventListener('click', () => {
+    nameEditor.classList.add('H');
+  });
+ 
+  if (nameSave) nameSave.addEventListener('click', () => {
+    const newName = (nameInput.value || '').trim();
+    if (!newName) { toast('Name cannot be empty', 'warn'); return; }
+    S.user.displayName = newName;
+    // Update displayed name
+    const pName = document.getElementById('pName');
+    if (pName) pName.textContent = newName;
+    // Update navbar avatar letter if no photo
+    if (!S.user.photoURL) {
+      const nbAv = document.getElementById('nbAv');
+      if (nbAv) nbAv.textContent = newName[0].toUpperCase();
+    }
+    nameEditor.classList.add('H');
+    toast('Name updated! ✅');
+    // Persist to localStorage
+    try { localStorage.setItem('devnix_name_' + (S.user.email||''), newName); } catch(e) {}
+  });
+ 
+  // Restore saved name from localStorage
+  try {
+    const savedLocalName = localStorage.getItem('devnix_name_' + (S.user.email||''));
+    if (savedLocalName && !u.displayName) S.user.displayName = savedLocalName;
+  } catch(e) {}
+ 
+  /* ── Action buttons ── */
   const pExp  = document.getElementById('pExp');
   const pRem  = document.getElementById('pRem');
   const pDark = document.getElementById('pDark');
@@ -995,7 +1185,6 @@ function renderProfile() {
   if (pDark) pDark.onclick = toggleDark;
   if (pOut)  pOut.onclick  = doLogout;
 }
-
 // ══════════════════════════════════════════════════════════
 //  FINANCE MODULE
 // ══════════════════════════════════════════════════════════

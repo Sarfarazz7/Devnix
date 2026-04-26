@@ -703,15 +703,12 @@ function renderDisciplineAnalytics() {
 function renderProfile() {
   const u = usr();
   if (!u) return;
-  const em = u.email || '';
+ 
+  const em   = u.email || '';
   const name = em.split('@')[0] || '?';
-  const avEl = document.getElementById('pAv');
-  const nameEl = document.getElementById('pName');
-  const emailEl = document.getElementById('pEmail');
-  if (avEl) avEl.textContent = (name[0] || '?').toUpperCase();
-  if (nameEl) nameEl.textContent = name;
-  if (emailEl) emailEl.textContent = em;
-
+  const initials = (name[0] || '?').toUpperCase();
+ 
+  /* ── Stats calculation ── */
   const td = today();
   let streak = 0;
   for (let i = 0; i < 120; i++) {
@@ -722,26 +719,281 @@ function renderProfile() {
   const todayP = (u.tasks || []).length
     ? Math.round((u.tasks || []).filter(t => u.done[t.id + '_' + td]).length / (u.tasks || []).length * 100)
     : 0;
-
-  const pStats = document.getElementById('pStats');
-  if (pStats) {
-    pStats.innerHTML = `
-      <div class="p-stat"><div class="p-stat-v">${(u.tasks || []).length}</div><div class="p-stat-l">Tasks</div></div>
-      <div class="p-stat"><div class="p-stat-v">${streak}</div><div class="p-stat-l">Day streak</div></div>
-      <div class="p-stat"><div class="p-stat-v">${todayP}%</div><div class="p-stat-l">Today</div></div>
-      <div class="p-stat"><div class="p-stat-v">${(u.transactions || []).length}</div><div class="p-stat-l">Transactions</div></div>
-      <div class="p-stat" style="grid-column:span 2"><div class="p-stat-v">${Object.keys(u.done).length}</div><div class="p-stat-l">Total check-ins</div></div>
-    `;
+ 
+  const totalWords = (u.journals || []).reduce((s, j) =>
+    s + ((j.body || '').split(/\s+/).filter(Boolean).length), 0);
+ 
+  let journalStreak = 0;
+  for (let i = 0; i < 60; i++) {
+    const d = dStr(addD(new Date(), -i));
+    if ((u.journals || []).some(j => j.date === d)) journalStreak++;
+    else if (i > 0) break;
   }
-
-  const pExp = document.getElementById('pExp');
-  const pRem = document.getElementById('pRem');
+ 
+  const { inc, exp, net } = calcTotals(u.transactions || []);
+ 
+  /* ── Render into #profileCardRoot ── */
+  const root = document.getElementById('profileCardRoot');
+  if (!root) return;
+ 
+  root.innerHTML = `
+    <!-- ── Cover + Avatar ── -->
+    <div class="prf-cover">
+      <div class="prf-cover-gradient"></div>
+    </div>
+ 
+    <div class="prf-identity">
+      <div class="prf-av-wrap">
+        <div class="p-av" id="pAv">${initials}</div>
+        <div class="prf-online-dot" title="Online"></div>
+      </div>
+      <div>
+        <div class="p-name" id="pName">${escHtml(name)}</div>
+        <div class="p-email" id="pEmail">${escHtml(em)}</div>
+      </div>
+    </div>
+ 
+    <!-- ── Main stats grid ── -->
+    <div class="prf-stats-grid" id="pStats">
+      ${[
+        { val: (u.tasks || []).length,          label: 'Tasks',       color: 'var(--p)'    },
+        { val: streak,                           label: 'Day streak',  color: 'var(--ambm)' },
+        { val: todayP + '%',                     label: 'Today',       color: 'var(--blumid)'},
+        { val: (u.transactions || []).length,    label: 'Transactions',color: 'var(--purmid)'},
+        { val: Object.keys(u.done).length,       label: 'Check-ins',   color: 'var(--telmid)'},
+        { val: (u.journals || []).length,        label: 'Journals',    color: 'var(--grnmid)'},
+      ].map(s => `
+        <div class="prf-stat">
+          <div class="prf-stat-val" style="color:${s.color}">${s.val}</div>
+          <div class="prf-stat-lbl">${s.label}</div>
+        </div>`).join('')}
+    </div>
+ 
+    <!-- ── Progress bar: today ── -->
+    <div class="prf-section">
+      <div class="prf-section-label">Today's progress</div>
+      <div class="prf-progress-wrap">
+        <div class="prf-progress-bar">
+          <div class="prf-progress-fill" style="width:${Math.min(todayP,100)}%;background:${todayP>=80?'var(--pm)':todayP>=50?'var(--ambm)':'var(--redm)'}"></div>
+        </div>
+        <span class="prf-progress-pct">${todayP}%</span>
+      </div>
+    </div>
+ 
+    <!-- ── Extended stats row ── -->
+    <div class="prf-extended-row">
+      <div class="prf-ext-card">
+        <div class="prf-ext-icon">📔</div>
+        <div class="prf-ext-val">${journalStreak}d</div>
+        <div class="prf-ext-lbl">Journal streak</div>
+      </div>
+      <div class="prf-ext-card">
+        <div class="prf-ext-icon">✍️</div>
+        <div class="prf-ext-val">${totalWords > 999 ? (totalWords/1000).toFixed(1)+'k' : totalWords}</div>
+        <div class="prf-ext-lbl">Words written</div>
+      </div>
+      <div class="prf-ext-card">
+        <div class="prf-ext-icon" style="color:${net>=0?'var(--grnmid)':'var(--redm)'}">💰</div>
+        <div class="prf-ext-val" style="color:${net>=0?'var(--grnmid)':'var(--redm)'}">${fmtCurrency(net)}</div>
+        <div class="prf-ext-lbl">Net savings</div>
+      </div>
+      <div class="prf-ext-card">
+        <div class="prf-ext-icon">🏆</div>
+        <div class="prf-ext-val">${(u.savingsGoals||[]).length}</div>
+        <div class="prf-ext-lbl">Goals</div>
+      </div>
+    </div>
+ 
+    <!-- ── Weekly heatmap ── -->
+    <div class="prf-section">
+      <div class="prf-section-label">Last 7 days</div>
+      <div class="prf-week-hm">
+        ${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map((day, i) => {
+          const d = dStr(addD(new Date(), -(6 - i)));
+          const tasks = u.tasks || [];
+          const done = tasks.length
+            ? tasks.filter(t => u.done[t.id + '_' + d]).length / tasks.length
+            : 0;
+          const lvl = done === 0 ? 0 : done < 0.5 ? 1 : done < 1 ? 2 : 3;
+          const colors = ['var(--bd)','#a5d6a7','#66bb6a','#2e7d32'];
+          return `<div class="prf-hm-day">
+            <div class="prf-hm-sq" style="background:${colors[lvl]}" title="${d}: ${Math.round(done*100)}%"></div>
+            <div class="prf-hm-lbl">${day[0]}</div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>
+ 
+    <!-- ── Actions ── -->
+    <div class="prf-section">
+      <div class="prf-section-label">Quick actions</div>
+      <div class="p-actions">
+        <button class="prf-action-btn" id="pExp">
+          <span class="prf-action-dot" style="background:var(--p)"></span>
+          Export discipline data (CSV)
+          <span class="prf-action-arrow">›</span>
+        </button>
+        <button class="prf-action-btn" id="pRem">
+          <span class="prf-action-dot" style="background:var(--ambm)"></span>
+          Send today's reminder
+          <span class="prf-action-arrow">›</span>
+        </button>
+        <button class="prf-action-btn" id="pDark">
+          <span class="prf-action-dot" style="background:var(--blumid)"></span>
+          Toggle dark mode
+          <span class="prf-action-arrow">›</span>
+        </button>
+      </div>
+    </div>
+ 
+    <!-- ── Danger zone ── -->
+    <div class="prf-section">
+      <div class="prf-section-label" style="color:var(--red)">Account</div>
+      <div class="p-actions">
+        <button class="prf-action-btn prf-danger" id="pOut">
+          Sign out of this device
+        </button>
+      </div>
+    </div>
+  `;
+ 
+  /* ── Inline styles for new profile elements (injected once) ── */
+  if (!document.getElementById('prf-styles')) {
+    const style = document.createElement('style');
+    style.id = 'prf-styles';
+    style.textContent = `
+      /* Cover */
+      .prf-cover {
+        margin: -28px -28px 0;
+        height: 80px;
+        background: linear-gradient(135deg, var(--p) 0%, var(--blumid) 100%);
+        border-radius: 14px 14px 0 0;
+        position: relative;
+        overflow: hidden;
+      }
+      .prf-cover-gradient {
+        position: absolute; inset: 0;
+        background: repeating-linear-gradient(
+          45deg,
+          transparent,
+          transparent 10px,
+          rgba(255,255,255,.04) 10px,
+          rgba(255,255,255,.04) 20px
+        );
+      }
+      /* Identity row */
+      .prf-identity {
+        display: flex;
+        align-items: flex-end;
+        gap: 14px;
+        margin-top: -28px;
+        margin-bottom: 18px;
+      }
+      .prf-av-wrap { position: relative; flex-shrink: 0; }
+      .prf-online-dot {
+        position: absolute; bottom: 2px; right: 2px;
+        width: 12px; height: 12px; border-radius: 50%;
+        background: var(--pm);
+        border: 2px solid var(--sf);
+      }
+      /* Stats grid */
+      .prf-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .prf-stat {
+        background: var(--sf2);
+        border-radius: 10px;
+        padding: 12px 8px;
+        text-align: center;
+        transition: transform .18s, box-shadow .18s;
+      }
+      .prf-stat:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,.1); }
+      .prf-stat-val { font-size: 18px; font-weight: 800; }
+      .prf-stat-lbl { font-size: 10px; color: var(--tx3); margin-top: 3px; text-transform: uppercase; letter-spacing: .04em; }
+      /* Section label */
+      .prf-section { margin-bottom: 14px; }
+      .prf-section-label {
+        font-size: 10px; font-weight: 700; color: var(--tx3);
+        text-transform: uppercase; letter-spacing: .08em;
+        margin-bottom: 8px;
+      }
+      /* Progress */
+      .prf-progress-wrap { display: flex; align-items: center; gap: 10px; }
+      .prf-progress-bar { flex: 1; height: 8px; background: var(--bd); border-radius: 4px; overflow: hidden; }
+      .prf-progress-fill { height: 100%; border-radius: 4px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+      .prf-progress-pct { font-size: 12px; font-weight: 700; color: var(--tx2); min-width: 34px; text-align: right; }
+      /* Extended row */
+      .prf-extended-row {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+        margin-bottom: 16px;
+      }
+      .prf-ext-card {
+        background: var(--sf2); border-radius: 10px; padding: 10px 8px;
+        text-align: center; border: 1px solid var(--bd);
+        transition: border-color .18s;
+      }
+      .prf-ext-card:hover { border-color: var(--bd2); }
+      .prf-ext-icon { font-size: 18px; margin-bottom: 4px; }
+      .prf-ext-val  { font-size: 14px; font-weight: 700; color: var(--tx); }
+      .prf-ext-lbl  { font-size: 9px; color: var(--tx3); margin-top: 2px; text-transform: uppercase; letter-spacing: .04em; }
+      /* Heatmap */
+      .prf-week-hm { display: flex; gap: 6px; }
+      .prf-hm-day  { display: flex; flex-direction: column; align-items: center; gap: 4px; flex: 1; }
+      .prf-hm-sq   { width: 100%; aspect-ratio: 1; border-radius: 4px; min-width: 24px; max-width: 40px; transition: transform .15s; }
+      .prf-hm-sq:hover { transform: scale(1.2); }
+      .prf-hm-lbl  { font-size: 9px; color: var(--tx3); }
+      /* Action buttons */
+      .prf-action-btn {
+        width: 100%; height: 40px; text-align: left;
+        padding: 0 14px;
+        display: flex; align-items: center; gap: 10px;
+        background: var(--sf2); border: 1px solid var(--bd);
+        border-radius: 9px; color: var(--tx2); font-size: 13px;
+        font-family: inherit; cursor: pointer;
+        transition: background .15s, border-color .15s;
+        margin-bottom: 6px;
+      }
+      .prf-action-btn:last-child { margin-bottom: 0; }
+      .prf-action-btn:hover { background: var(--sf3); border-color: var(--bd2); color: var(--tx); }
+      .prf-action-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+      .prf-action-arrow { margin-left: auto; color: var(--tx3); font-size: 16px; }
+      .prf-danger { color: var(--red) !important; border-color: var(--redbg) !important; }
+      .prf-danger:hover { background: var(--redbg) !important; }
+ 
+      /* ── Responsive overrides ── */
+      @media (max-width: 767px) {
+        .prf-cover { margin: -20px -20px 0; }
+        .prf-stats-grid { grid-template-columns: repeat(3, 1fr); gap: 6px; }
+        .prf-stat { padding: 10px 4px; }
+        .prf-stat-val { font-size: 15px; }
+        .prf-extended-row { grid-template-columns: repeat(2, 1fr); }
+        .prf-action-btn { font-size: 12px; }
+        .prf-identity { gap: 10px; }
+        .p-av { width: 52px !important; height: 52px !important; font-size: 20px !important; margin-bottom: 0; }
+      }
+      @media (max-width: 380px) {
+        .prf-stats-grid { grid-template-columns: repeat(2, 1fr); }
+        .prf-extended-row { grid-template-columns: repeat(2, 1fr); }
+        .prf-week-hm { gap: 3px; }
+      }
+    `;
+    document.head.appendChild(style);
+  }
+ 
+  /* ── Wire up buttons ── */
+  const pExp  = document.getElementById('pExp');
+  const pRem  = document.getElementById('pRem');
   const pDark = document.getElementById('pDark');
-  const pOut = document.getElementById('pOut');
-  if (pExp) pExp.onclick = doExport;
-  if (pRem) pRem.onclick = () => { showReminder(); toast('Reminder shown!'); };
+  const pOut  = document.getElementById('pOut');
+  if (pExp)  pExp.onclick  = doExport;
+  if (pRem)  pRem.onclick  = () => { showReminder(); toast('Reminder shown!'); };
   if (pDark) pDark.onclick = toggleDark;
-  if (pOut) pOut.onclick = doLogout;
+  if (pOut)  pOut.onclick  = doLogout;
 }
 
 // ══════════════════════════════════════════════════════════

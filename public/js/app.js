@@ -1148,6 +1148,7 @@ async function saveBudget() {
   try {
     const raw = await API.Budgets.set(cat, amt);
 S.user.budgets = { ...toPlainObj(S.user.budgets), ...toPlainObj(raw) };
+    console.log('Budgets after save:', S.user.budgets);
     document.getElementById('budgetModal').classList.add('H');
     refreshAnalyticsCharts(S.user.transactions || []);
     toast('Budget set for ' + cat + '!');

@@ -15,7 +15,7 @@
 
 
 // ── Global state ──────────────────────────────────────────
-const GEMINI_KEY_COACH = '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';
+const GEMINI_KEY_COACH = '';
 let S = { user: null, dark: false };
 let wOff = 0, barCI = null, lineCI = null, analyDays = 14;
 let dragActive = false, dragVal = false;

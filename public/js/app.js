@@ -2037,6 +2037,10 @@ function mountApp() {
     };
   });
 })();
+// ── Keep backend alive ─────────────────────────────────────
+setInterval(async () => {
+  try { await fetch('https://devnix-backend.onrender.com/api/health'); } catch (e) { }
+}, 10 * 60 * 1000); // ping every 10 minutes
 
 // ── Start the app ─────────────────────────────────────────
 boot();

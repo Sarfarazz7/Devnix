@@ -1674,120 +1674,227 @@ function renderJournalAnalyticsPanel(journals) {
   const wrap = document.createElement('div');
   wrap.className = 'jan-wrap';
   if (!journals.length) {
-    wrap.innerHTML = '<div style="padding:32px;text-align:center;font-size:13px;color:var(--tx3)">✍ Write a few entries to unlock analytics.</div>';
+    wrap.innerHTML = '<div style="padding:48px;text-align:center;font-size:13px;color:var(--tx3)">✍ Write a few entries to unlock analytics.</div>';
     return wrap;
   }
 
-  const avgWords = Math.round(journals.reduce((s, j) => s + ((j.body || '').split(/\s+/).filter(Boolean).length), 0) / journals.length);
+  // ── Compute stats ──────────────────────────────────────
+  const totalWords = journals.reduce((s, j) => s + ((j.body || '').split(/\s+/).filter(Boolean).length), 0);
+  const avgWords = Math.round(totalWords / journals.length);
   const moodCounts = {};
   journals.filter(j => j.mood).forEach(j => { moodCounts[j.mood] = (moodCounts[j.mood] || 0) + 1; });
   const topMood = Object.entries(moodCounts).sort((a, b) => b[1] - a[1])[0];
-  let streak = 0;
+  let streak = 0, longestStreak = 0, cur = 0;
+  const dateSet = new Set(journals.map(j => j.date));
   for (let i = 0; i < 365; i++) {
     const d = dStr(addD(new Date(), -i));
-    if (journals.some(j => j.date === d)) streak++;
-    else if (i > 0) break;
+    if (dateSet.has(d)) { streak++; } else if (i > 0) break;
   }
+  const sortedDates = [...dateSet].sort();
+  for (let i = 0; i < sortedDates.length; i++) {
+    if (i === 0) { cur = 1; }
+    else {
+      const prev = new Date(sortedDates[i-1] + 'T12:00:00');
+      const curr = new Date(sortedDates[i] + 'T12:00:00');
+      const diff = Math.round((curr - prev) / 86400000);
+      cur = diff === 1 ? cur + 1 : 1;
+    }
+    longestStreak = Math.max(longestStreak, cur);
+  }
+  const thisMonth = journals.filter(j => {
+    const d = new Date(j.date + 'T12:00:00'), n = new Date();
+    return d.getMonth() === n.getMonth() && d.getFullYear() === n.getFullYear();
+  }).length;
 
-  const kpiRow = document.createElement('div');
-  kpiRow.className = 'jan-kpi-row';
-  kpiRow.innerHTML = [
-    { icon: '📊', val: journals.length, lbl: 'Total entries' },
-    { icon: '🔥', val: streak, lbl: 'Day streak' },
-    { icon: '📝', val: avgWords, lbl: 'Avg words' },
-    { icon: topMood ? topMood[0] : '😊', val: topMood ? topMood[1] : 0, lbl: 'Top mood count' }
-  ].map((k, i) => `<div class="jan-kpi" style="animation-delay:${i * 60}ms"><div class="jan-kpi-icon">${k.icon}</div><div class="jan-kpi-val">${k.val}</div><div class="jan-kpi-lbl">${k.lbl}</div></div>`).join('');
-  wrap.appendChild(kpiRow);
-
-  const MOOD_SCORE = { '😢': 1, '😞': 2, '😐': 3, '🙂': 4, '😊': 5, '😄': 6, '🤩': 7, '😡': 1, '😰': 2, '😴': 3 };
-  const moodEntries = journals.filter(j => j.mood && MOOD_SCORE[j.mood] !== undefined).sort((a, b) => a.date.localeCompare(b.date)).slice(-30);
-
-  const moodSection = document.createElement('div');
-  moodSection.className = 'jan-chart-section';
-  moodSection.innerHTML = `<div class="jan-chart-title">📈 Mood Over Time <span class="jan-chart-sub">(last 30 entries)</span></div><div class="jan-chart-wrap"><canvas id="moodLineChart"></canvas></div>`;
-  wrap.appendChild(moodSection);
-
-  const moodDistSection = document.createElement('div');
-  moodDistSection.className = 'jan-chart-section jan-chart-half';
-  moodDistSection.innerHTML = `<div class="jan-chart-title">😊 Mood Distribution</div><div class="jan-chart-wrap" style="height:200px"><canvas id="moodDonutChart"></canvas></div><div id="moodLegend" class="jan-mood-legend"></div>`;
-  wrap.appendChild(moodDistSection);
-
-  const heatSection = document.createElement('div');
-  heatSection.className = 'jan-chart-section jan-chart-half';
-  heatSection.innerHTML = `<div class="jan-chart-title">📅 Writing Frequency <span class="jan-chart-sub">(last 12 weeks)</span></div><div id="journalHeatmap" class="jan-heatmap"></div>`;
-  wrap.appendChild(heatSection);
-
-  const wordsSection = document.createElement('div');
-  wordsSection.className = 'jan-chart-section';
-  wordsSection.innerHTML = `<div class="jan-chart-title">📝 Words per Entry <span class="jan-chart-sub">(last 14 entries)</span></div><div class="jan-chart-wrap"><canvas id="wordsBarChart"></canvas></div>`;
-  wrap.appendChild(wordsSection);
+  const MOOD_COLORS_MAP = {
+    '😊': '#22c55e', '😌': '#06b6d4', '🔥': '#f97316',
+    '😔': '#64748b', '😤': '#ef4444', '😴': '#94a3b8',
+    '🤔': '#8b5cf6', '🎉': '#fbbf24',
+    '😄': '#16a34a', '🤩': '#10b981', '🙂': '#86efac',
+    '😐': '#cbd5e1', '😞': '#fb923c', '😢': '#dc2626',
+    '😡': '#b91c1c', '😰': '#7c3aed'
+  };
+  const MOOD_SCORE = {
+    '😊': 5, '😌': 4, '🔥': 5, '😔': 2, '😤': 1,
+    '😴': 2, '🤔': 3, '🎉': 6, '😄': 6, '🤩': 7,
+    '🙂': 4, '😐': 3, '😞': 2, '😢': 1, '😡': 1, '😰': 2
+  };
 
   const tcC = () => isDk() ? '#6b7280' : '#9ca3af';
-  const gcC = () => isDk() ? '#1f2937' : '#f3f4f6';
+  const gcC = () => isDk() ? 'rgba(255,255,255,.04)' : 'rgba(0,0,0,.04)';
+  const cardBg = isDk() ? '#13161f' : '#f8fafc';
+  const cardBorder = isDk() ? '#1e2333' : '#e2e8f0';
 
+  // ── KPI Row ─────────────────────────────────────────────
+  wrap.innerHTML = `
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:16px">
+    ${[
+      { icon: '📓', val: journals.length, lbl: 'Total entries', color: '#8b5cf6' },
+      { icon: '🔥', val: streak + ' days', lbl: 'Current streak', color: '#f97316' },
+      { icon: '🏆', val: longestStreak + ' days', lbl: 'Longest streak', color: '#fbbf24' },
+      { icon: '📝', val: avgWords, lbl: 'Avg words/entry', color: '#06b6d4' },
+    ].map((k, i) => `
+      <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:16px;animation:fadeUp .4s ease both;animation-delay:${i*60}ms">
+        <div style="font-size:22px;margin-bottom:6px">${k.icon}</div>
+        <div style="font-size:22px;font-weight:800;color:${k.color};line-height:1">${k.val}</div>
+        <div style="font-size:11px;color:var(--tx3);margin-top:4px">${k.lbl}</div>
+      </div>`).join('')}
+  </div>
+
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px">
+    <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">📈 MOOD TREND</div>
+      <div style="position:relative;height:160px"><canvas id="janMoodLine"></canvas></div>
+    </div>
+    <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px">
+      <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">🎭 MOOD SPLIT</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div style="position:relative;height:140px;width:140px;flex-shrink:0"><canvas id="janMoodDonut"></canvas></div>
+        <div id="janMoodLegend" style="flex:1;display:flex;flex-direction:column;gap:5px;font-size:11px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px;margin-bottom:12px">
+    <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">📅 WRITING CONSISTENCY <span style="font-weight:400;color:var(--tx3);font-size:11px">(last 84 days)</span></div>
+    <div id="janHeatmap" style="display:grid;grid-template-columns:repeat(12,1fr);gap:4px"></div>
+    <div style="display:flex;justify-content:space-between;margin-top:8px;font-size:10px;color:var(--tx3)">
+      <span>12 weeks ago</span><span>Today</span>
+    </div>
+  </div>
+
+  <div style="background:${cardBg};border:1px solid ${cardBorder};border-radius:14px;padding:18px">
+    <div style="font-size:12px;font-weight:700;color:var(--tx2);margin-bottom:12px;letter-spacing:.5px">✍ WORDS PER ENTRY <span style="font-weight:400;color:var(--tx3);font-size:11px">(last 10 entries)</span></div>
+    <div style="position:relative;height:140px"><canvas id="janWordsBar"></canvas></div>
+  </div>`;
+
+  // ── Charts ───────────────────────────────────────────────
   requestAnimationFrame(() => {
     // Mood line
-    const moodLineEl = document.getElementById('moodLineChart');
-    if (moodLineEl && moodEntries.length > 1) {
-      const moodColors = moodEntries.map(e => { const s = MOOD_SCORE[e.mood] || 3; return s >= 5 ? '#22c55e' : s >= 4 ? '#86efac' : s >= 3 ? '#fbbf24' : '#ef4444'; });
-      new Chart(moodLineEl, {
-        type: 'line',
-        data: {
-          labels: moodEntries.map(e => { const d = new Date(e.date + 'T12:00:00'); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }),
-          datasets: [{ label: 'Mood', data: moodEntries.map(e => MOOD_SCORE[e.mood] || 3), borderColor: '#8b5cf6', backgroundColor: 'rgba(139,92,246,0.08)', borderWidth: 2.5, fill: true, tension: 0.4, pointRadius: 5, pointBackgroundColor: moodColors }]
-        },
-        options: {
-          responsive: true, maintainAspectRatio: false, animation: { duration: 800 },
-          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => { const e = moodEntries[c.dataIndex]; const labels = { 1: 'Very low', 2: 'Low', 3: 'Neutral', 4: 'Good', 5: 'Happy', 6: 'Very happy', 7: 'Excellent' }; return `${e.mood}  ${labels[c.parsed.y] || 'Neutral'}`; } } } },
-          scales: { y: { min: 1, max: 7, ticks: { stepSize: 1, font: { size: 10 }, color: tcC(), callback: v => ['', '😢', '😞', '😐', '🙂', '😊', '😄', '🤩'][v] || '' }, grid: { color: gcC() } }, x: { ticks: { font: { size: 9 }, color: tcC(), maxTicksLimit: 10 }, grid: { display: false } } }
-        }
-      });
-    } else if (moodLineEl) {
-      moodLineEl.closest('.jan-chart-wrap').innerHTML = '<div style="height:180px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px">Add mood to at least 2 entries to see the trend</div>';
+    const moodEntries = journals
+      .filter(j => j.mood && MOOD_SCORE[j.mood] !== undefined)
+      .sort((a, b) => a.date.localeCompare(b.date))
+      .slice(-20);
+
+    const moodLineEl = document.getElementById('janMoodLine');
+    if (moodLineEl) {
+      if (moodEntries.length >= 2) {
+        const ptColors = moodEntries.map(e => MOOD_COLORS_MAP[e.mood] || '#8b5cf6');
+        new Chart(moodLineEl, {
+          type: 'line',
+          data: {
+            labels: moodEntries.map(e => {
+              const d = new Date(e.date + 'T12:00:00');
+              return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+            }),
+            datasets: [{
+              data: moodEntries.map(e => MOOD_SCORE[e.mood] || 3),
+              borderColor: '#8b5cf6',
+              backgroundColor: 'rgba(139,92,246,0.08)',
+              borderWidth: 2.5, fill: true, tension: 0.4,
+              pointRadius: 6, pointBackgroundColor: ptColors,
+              pointBorderColor: isDk() ? '#13161f' : '#fff',
+              pointBorderWidth: 2
+            }]
+          },
+          options: {
+            responsive: true, maintainAspectRatio: false,
+            animation: { duration: 900, easing: 'easeOutQuart' },
+            plugins: {
+              legend: { display: false },
+              tooltip: { callbacks: { label: c => {
+                const e = moodEntries[c.dataIndex];
+                const lbl = { 1:'Very low',2:'Low',3:'Neutral',4:'Good',5:'Happy',6:'Excited',7:'Excellent' };
+                return e.mood + '  ' + (lbl[c.parsed.y] || 'Neutral');
+              }}}
+            },
+            scales: {
+              y: { min: 1, max: 7, ticks: { stepSize: 2, font: { size: 10 }, color: tcC(),
+                callback: v => (['','😢','','😐','','😊','','🤩'][v] || '') }, grid: { color: gcC() } },
+              x: { ticks: { font: { size: 9 }, color: tcC(), maxTicksLimit: 8 }, grid: { display: false } }
+            }
+          }
+        });
+      } else {
+        moodLineEl.parentElement.innerHTML = `<div style="height:160px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px;text-align:center">Add mood to at least<br>2 entries to see trend</div>`;
+      }
     }
 
     // Mood donut
-    const moodDonutEl = document.getElementById('moodDonutChart');
+    const moodDonutEl = document.getElementById('janMoodDonut');
     if (moodDonutEl && Object.keys(moodCounts).length) {
-      const MOOD_COLORS_MAP = {
-        '😊': '#22c55e', '😌': '#06b6d4', '🔥': '#f97316',
-        '😔': '#64748b', '😤': '#ef4444', '😴': '#94a3b8',
-        '🤔': '#8b5cf6', '🎉': '#fbbf24',
-        '😄': '#16a34a', '🤩': '#10b981', '🙂': '#86efac',
-        '😐': '#cbd5e1', '😞': '#fb923c', '😢': '#dc2626',
-        '😡': '#b91c1c', '😰': '#7c3aed'
-      };
-      const labels = Object.keys(moodCounts), data = labels.map(k => moodCounts[k]), colors = labels.map(k => MOOD_COLORS_MAP[k] || '#94a3b8');
+      const labels = Object.keys(moodCounts);
+      const data = labels.map(k => moodCounts[k]);
+      const colors = labels.map(k => MOOD_COLORS_MAP[k] || '#94a3b8');
       new Chart(moodDonutEl, {
         type: 'doughnut',
-        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 2, borderColor: isDk() ? '#111827' : '#ffffff' }] },
-        options: { responsive: true, maintainAspectRatio: false, cutout: '60%', animation: { duration: 700 }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.label}  ${c.parsed} entries (${Math.round(c.parsed / journals.filter(j => j.mood).length * 100)}%)` } } } }
+        data: { labels, datasets: [{ data, backgroundColor: colors, borderWidth: 3,
+          borderColor: isDk() ? '#13161f' : '#ffffff', hoverOffset: 6 }] },
+        options: {
+          responsive: true, maintainAspectRatio: false, cutout: '68%',
+          animation: { duration: 800 },
+          plugins: { legend: { display: false }, tooltip: { callbacks: {
+            label: c => c.label + '  ' + c.parsed + ' entries'
+          }}}
+        }
       });
       const total = data.reduce((a, b) => a + b, 0);
-      const legendEl = document.getElementById('moodLegend');
-      if (legendEl) legendEl.innerHTML = labels.map((l, i) => `<div class="jan-legend-item"><span class="jan-legend-dot" style="background:${colors[i]}"></span>${l} <span class="jan-legend-pct">${Math.round(data[i] / total * 100)}%</span></div>`).join('');
+      const legendEl = document.getElementById('janMoodLegend');
+      if (legendEl) legendEl.innerHTML = labels.map((l, i) =>
+        `<div style="display:flex;align-items:center;gap:6px">
+          <span style="width:8px;height:8px;border-radius:50%;background:${colors[i]};flex-shrink:0"></span>
+          <span style="color:var(--tx2)">${l}</span>
+          <span style="color:var(--tx3);margin-left:auto">${Math.round(data[i]/total*100)}%</span>
+        </div>`).join('');
+    } else if (moodDonutEl) {
+      moodDonutEl.parentElement.innerHTML = `<div style="height:140px;display:flex;align-items:center;justify-content:center;color:var(--tx3);font-size:12px">No mood data yet</div>`;
     }
 
     // Heatmap
-    const heatEl = document.getElementById('journalHeatmap');
+    const heatEl = document.getElementById('janHeatmap');
     if (heatEl) {
-      const dateSet = new Set(journals.map(j => j.date));
-      const today2 = new Date();
-      const days = [];
-      for (let i = 83; i >= 0; i--) { const d = new Date(today2); d.setDate(d.getDate() - i); days.push(dStr(d)); }
-      heatEl.innerHTML = `<div class="jan-heat-grid">${days.map(d => { const has = dateSet.has(d); const dt = new Date(d + 'T12:00:00'); return `<div class="jan-heat-cell ${has ? 'active' : ''}" title="${dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}${has ? ' ✓' : ''}"></div>`; }).join('')}</div>`;
+      heatEl.innerHTML = '';
+      for (let i = 83; i >= 0; i--) {
+        const d = dStr(addD(new Date(), -i));
+        const has = dateSet.has(d);
+        const dt = new Date(d + 'T12:00:00');
+        const cell = document.createElement('div');
+        cell.title = dt.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + (has ? ' ✓ wrote' : '');
+        cell.style.cssText = `
+          aspect-ratio:1;border-radius:4px;cursor:default;transition:transform .15s;
+          background:${has ? '#8b5cf6' : (isDk() ? '#1e2333' : '#e2e8f0')};
+          ${has ? 'box-shadow:0 0 6px rgba(139,92,246,.4)' : ''}
+        `;
+        if (has) cell.addEventListener('mouseenter', () => cell.style.transform = 'scale(1.2)');
+        cell.addEventListener('mouseleave', () => cell.style.transform = '');
+        heatEl.appendChild(cell);
+      }
     }
 
     // Words bar
-    const wordsEl = document.getElementById('wordsBarChart');
+    const wordsEl = document.getElementById('janWordsBar');
     if (wordsEl) {
-      const last14 = [...journals].sort((a, b) => a.date.localeCompare(b.date)).slice(-14);
-      const wordCounts = last14.map(j => (j.body || '').split(/\s+/).filter(Boolean).length);
-      const barColors = wordCounts.map(w => w > 200 ? '#8b5cf6' : w > 100 ? '#06b6d4' : w > 50 ? '#22c55e' : '#94a3b8');
+      const last10 = [...journals].sort((a, b) => a.date.localeCompare(b.date)).slice(-10);
+      const wCounts = last10.map(j => (j.body || '').split(/\s+/).filter(Boolean).length);
+      const barColors = wCounts.map(w => w > 300 ? '#8b5cf6' : w > 150 ? '#06b6d4' : w > 50 ? '#22c55e' : '#94a3b8');
       new Chart(wordsEl, {
         type: 'bar',
-        data: { labels: last14.map(j => { const d = new Date(j.date + 'T12:00:00'); return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }); }), datasets: [{ data: wordCounts, backgroundColor: barColors, borderRadius: 5, borderSkipped: false }] },
-        options: { responsive: true, maintainAspectRatio: false, animation: { duration: 700 }, plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => `${c.parsed.y} words` } } }, scales: { y: { ticks: { font: { size: 10 }, color: tcC() }, grid: { color: gcC() } }, x: { ticks: { font: { size: 9 }, color: tcC() }, grid: { display: false } } } }
+        data: {
+          labels: last10.map(j => {
+            const d = new Date(j.date + 'T12:00:00');
+            return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+          }),
+          datasets: [{ data: wCounts, backgroundColor: barColors, borderRadius: 6, borderSkipped: false }]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          animation: { duration: 700 },
+          plugins: { legend: { display: false }, tooltip: { callbacks: { label: c => c.parsed.y + ' words' } } },
+          scales: {
+            y: { ticks: { font: { size: 10 }, color: tcC() }, grid: { color: gcC() } },
+            x: { ticks: { font: { size: 9 }, color: tcC() }, grid: { display: false } }
+          }
+        }
       });
     }
   });

@@ -13,7 +13,9 @@
 // 10. editTxModal: fixed position so it overlays correctly
 // ─────────────────────────────────────────────────────────
 
+
 // ── Global state ──────────────────────────────────────────
+const GEMINI_KEY_COACH = 'AIzaSyA6de1dC2-GoGzGoPvo0xE6rnh6KO4LUVo';
 let S = { user: null, dark: false };
 let wOff = 0, barCI = null, lineCI = null, analyDays = 14;
 let dragActive = false, dragVal = false;
@@ -225,6 +227,7 @@ document.querySelectorAll('.nb-btn').forEach(btn => {
     const pg = btn.dataset.pg;
     if (pg === 'dashboard') {
       document.getElementById('pgDashboard').classList.remove('H');
+      setTimeout(() => renderCommandCenter(), 100);
     } else if (pg === 'finance') {
       document.getElementById('pgFinance').classList.remove('H');
       setTimeout(() => renderFinOverview(), 80);
@@ -2172,6 +2175,354 @@ function renderJournalBookView(wrap, entry) {
 }
 
 // ══════════════════════════════════════════════════════════
+//  AI LIFE COACH + INSIGHT ENGINE + COMMAND CENTER
+// ══════════════════════════════════════════════════════════
+
+// ── Compute cross-module data snapshot ─────────────────────
+function getLifeSnapshot() {
+  const u = usr();
+  if (!u) return null;
+  const td = today();
+
+  // Habits
+  const tasks = u.tasks || [];
+  const todayDone = tasks.filter(t => u.done[t.id + '_' + td]).length;
+  const todayPct = tasks.length ? Math.round(todayDone / tasks.length * 100) : 0;
+  let streak = 0;
+  for (let i = 0; i < 120; i++) {
+    const d = dStr(addD(new Date(), -i));
+    if (tasks.length && tasks.every(t => u.done[t.id + '_' + d])) streak++;
+    else if (i > 0) break;
+  }
+  const last7Habit = Array.from({length: 7}, (_, i) => dStr(addD(new Date(), -i))).map(d =>
+    tasks.length ? Math.round(tasks.filter(t => u.done[t.id + '_' + d]).length / tasks.length * 100) : 0
+  );
+  const avgHabit7 = Math.round(last7Habit.reduce((a, b) => a + b, 0) / 7);
+
+  // Finance
+  const txns = u.transactions || [];
+  const now = new Date();
+  const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const monthTxns = txns.filter(t => (t.date || '').startsWith(monthStart));
+  const monthInc = monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amt), 0);
+  const monthExp = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amt), 0);
+  const monthNet = monthInc - monthExp;
+  const catMap = {};
+  monthTxns.filter(t => t.type === 'expense').forEach(t => { catMap[t.cat] = (catMap[t.cat] || 0) + Math.abs(t.amt); });
+  const topExpCat = Object.entries(catMap).sort((a, b) => b[1] - a[1])[0];
+  const budgets = getBudgets();
+  const overBudgetCats = Object.entries(budgets).filter(([cat, bud]) => (catMap[cat] || 0) > bud).map(([cat]) => cat);
+
+  // Goals
+  const goals = getGoals();
+  const nearGoals = goals.filter(g => {
+    const pct = Math.round(g.saved / g.target * 100);
+    return pct >= 70 && pct < 100;
+  });
+
+  // Journal
+  const journals = u.journals || [];
+  const recentMoods = journals.slice(0, 5).map(j => j.mood).filter(Boolean);
+  const todayJournal = journals.find(j => j.date === td);
+  let journalStreak = 0;
+  for (let i = 0; i < 30; i++) {
+    const d = dStr(addD(new Date(), -i));
+    if (journals.some(j => j.date === d)) journalStreak++;
+    else if (i > 0) break;
+  }
+
+  return {
+    habits:  { todayPct, streak, avgHabit7, totalTasks: tasks.length, todayDone, missedToday: tasks.length - todayDone },
+    finance: { monthInc, monthExp, monthNet, topExpCat, overBudgetCats, savingsRate: monthInc > 0 ? Math.round(monthNet / monthInc * 100) : 0 },
+    goals:   { total: goals.length, nearComplete: nearGoals.map(g => g.name) },
+    journal: { recentMoods, hasWrittenToday: !!todayJournal, journalStreak }
+  };
+}
+
+// ── Build AI prompt from snapshot ──────────────────────────
+function buildCoachPrompt(snap) {
+  const { habits, finance, journal, goals } = snap;
+  const name = (usr()?.email || '').split('@')[0] || 'there';
+  const dayOfWeek = new Date().toLocaleDateString('en-US', { weekday: 'long' });
+  return `You are a friendly, motivational personal life coach AI for a productivity app called Devnix.
+The user's name is ${name}. Today is ${dayOfWeek}.
+
+Here is their current data:
+HABITS: ${habits.todayPct}% done today (${habits.todayDone}/${habits.totalTasks} tasks), ${habits.streak}-day streak, ${habits.avgHabit7}% avg last 7 days, ${habits.missedToday} tasks still pending today
+FINANCE: This month — Income ₹${Math.round(finance.monthInc)}, Expenses ₹${Math.round(finance.monthExp)}, Net ₹${Math.round(finance.monthNet)}, Savings rate ${finance.savingsRate}%${finance.topExpCat ? ', Top spend: ' + finance.topExpCat[0] + ' ₹' + Math.round(finance.topExpCat[1]) : ''}${finance.overBudgetCats.length ? ', Over budget in: ' + finance.overBudgetCats.join(', ') : ''}
+GOALS: ${goals.total} savings goals${goals.nearComplete.length ? ', Near completion: ' + goals.nearComplete.join(', ') : ''}
+JOURNAL: ${journal.hasWrittenToday ? 'Has written today' : 'Has NOT written today'}, ${journal.journalStreak}-day journal streak, Recent moods: ${journal.recentMoods.join(' ') || 'none recorded'}
+
+Write a SHORT, friendly, motivational daily summary (3-4 sentences MAX). Be specific using their actual numbers. Include:
+1. One positive observation or encouragement
+2. One specific action they should take TODAY
+3. One financial tip if relevant
+
+Keep it conversational, warm, and under 80 words. Use 1-2 emojis naturally. Write as flowing natural text — NO bullet points or headers.`;
+}
+
+// ── Render Daily Command Center ─────────────────────────────
+async function renderCommandCenter() {
+  const el = document.getElementById('commandCenter');
+  if (!el) return;
+  const snap = getLifeSnapshot();
+  if (!snap) return;
+  const { habits, finance, journal } = snap;
+  const u = usr();
+  const name = (u?.email || '').split('@')[0] || 'there';
+  const hour = new Date().getHours();
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening';
+  const insights = computeCrossInsights(snap);
+  const predictions = computeFinancePredictions();
+  const cb = isDk() ? '#13161f' : '#f8fafc';
+  const cbr = isDk() ? '#1e2333' : '#e2e8f0';
+
+  el.innerHTML = `
+    <div style="margin-bottom:20px">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+        <div>
+          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">${greeting}</div>
+          <div style="font-size:20px;font-weight:800;color:var(--tx)">${name.charAt(0).toUpperCase() + name.slice(1)} 👋</div>
+        </div>
+        <div style="font-size:11px;color:var(--tx3)">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+      </div>
+
+      <div id="aiCoachCard" style="background:linear-gradient(135deg,${isDk() ? '#1a1040' : '#ede9fe'},${isDk() ? '#0d2044' : '#dbeafe'});border:1px solid ${isDk() ? '#2d1f6e' : '#c4b5fd'};border-radius:16px;padding:18px;margin-bottom:12px">
+        <div style="display:flex;align-items:flex-start;gap:12px">
+          <div style="font-size:28px;flex-shrink:0">🤖</div>
+          <div style="flex:1">
+            <div style="font-size:11px;font-weight:700;color:${isDk() ? '#a78bfa' : '#7c3aed'};letter-spacing:.5px;margin-bottom:6px">AI LIFE COACH</div>
+            <div id="aiCoachText" style="font-size:13px;color:var(--tx2);line-height:1.6">
+              <span style="color:var(--tx3)">✨ Analyzing your day...</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
+        <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
+          <div style="font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px;margin-bottom:6px">💪 HABITS TODAY</div>
+          <div style="font-size:24px;font-weight:800;color:${habits.todayPct >= 80 ? '#22c55e' : habits.todayPct >= 50 ? '#f97316' : '#ef4444'}">${habits.todayPct}%</div>
+          <div style="font-size:11px;color:var(--tx3)">${habits.todayDone}/${habits.totalTasks} done · ${habits.streak}d streak</div>
+          <div style="height:3px;background:${isDk() ? '#1e2333' : '#e2e8f0'};border-radius:2px;margin-top:8px">
+            <div style="height:100%;width:${Math.min(habits.todayPct, 100)}%;background:${habits.todayPct >= 80 ? '#22c55e' : habits.todayPct >= 50 ? '#f97316' : '#ef4444'};border-radius:2px;transition:width .8s"></div>
+          </div>
+        </div>
+        <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
+          <div style="font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px;margin-bottom:6px">💰 THIS MONTH</div>
+          <div style="font-size:20px;font-weight:800;color:${finance.monthNet >= 0 ? '#22c55e' : '#ef4444'}">${fmtCurrency(finance.monthNet)}</div>
+          <div style="font-size:11px;color:var(--tx3)">${finance.savingsRate}% savings rate</div>
+          ${finance.overBudgetCats.length ? `<div style="font-size:10px;color:#ef4444;margin-top:4px">⚠ Over: ${finance.overBudgetCats[0]}</div>` : `<div style="font-size:10px;color:#22c55e;margin-top:4px">✓ Budgets on track</div>`}
+        </div>
+        <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
+          <div style="font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px;margin-bottom:6px">📔 JOURNAL</div>
+          <div style="font-size:20px;font-weight:800;color:${journal.hasWrittenToday ? '#22c55e' : '#94a3b8'}">${journal.hasWrittenToday ? 'Written ✓' : 'Not yet'}</div>
+          <div style="font-size:11px;color:var(--tx3)">${journal.journalStreak}d writing streak</div>
+          <div style="font-size:11px;color:var(--tx3);margin-top:2px">Mood: ${journal.recentMoods[0] || '—'}</div>
+        </div>
+      </div>
+
+      ${insights.length ? `
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px;margin-bottom:12px">
+        <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:10px;letter-spacing:.5px">🧠 CROSS-MODULE INSIGHTS</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${insights.map(ins => `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:${ins.bg};border-radius:8px;border-left:3px solid ${ins.color}"><span style="font-size:14px">${ins.icon}</span><div><div style="font-size:12px;font-weight:600;color:${ins.color}">${ins.title}</div><div style="font-size:11px;color:var(--tx3)">${ins.body}</div></div></div>`).join('')}
+        </div>
+      </div>` : ''}
+
+      ${predictions.length ? `
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
+        <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:10px;letter-spacing:.5px">📈 FINANCIAL PREDICTIONS</div>
+        <div style="display:flex;flex-direction:column;gap:8px">
+          ${predictions.map(p => `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:${p.bg};border-radius:8px"><span style="font-size:14px">${p.icon}</span><div><div style="font-size:12px;font-weight:600;color:${p.color}">${p.title}</div><div style="font-size:11px;color:var(--tx3)">${p.body}</div></div></div>`).join('')}
+        </div>
+      </div>` : ''}
+    </div>
+  `;
+
+  fetchAICoach(snap);
+}
+
+// ── Fetch AI Coach text from Gemini ────────────────────────
+async function fetchAICoach(snap) {
+  const textEl = document.getElementById('aiCoachText');
+  if (!textEl) return;
+  try {
+    const res = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY_COACH}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ parts: [{ text: buildCoachPrompt(snap) }] }],
+          generationConfig: { maxOutputTokens: 150, temperature: 0.8 }
+        })
+      }
+    );
+    const data = await res.json();
+    const msg = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
+    if (msg) {
+      textEl.style.opacity = '0';
+      textEl.style.transition = 'opacity .4s';
+      setTimeout(() => { textEl.textContent = msg; textEl.style.opacity = '1'; }, 400);
+    } else { textEl.textContent = generateFallbackCoach(snap); }
+  } catch (e) { textEl.textContent = generateFallbackCoach(snap); }
+}
+
+// ── Fallback coach (no API) ─────────────────────────────────
+function generateFallbackCoach(snap) {
+  const { habits, finance, journal } = snap;
+  const name = (usr()?.email || '').split('@')[0] || 'there';
+  const msgs = [];
+  if (habits.streak >= 3) msgs.push(`🔥 ${habits.streak}-day streak! Keep it going ${name}!`);
+  if (habits.todayPct === 100) msgs.push('💪 All habits done — you\'re unstoppable!');
+  else if (habits.missedToday > 0) msgs.push(`You still have ${habits.missedToday} habit${habits.missedToday > 1 ? 's' : ''} left today — finish strong!`);
+  if (finance.monthNet > 0) msgs.push(`Great job saving ${fmtCurrency(finance.monthNet)} this month!`);
+  else if (finance.monthNet < 0) msgs.push(`Watch spending — you\'re ${fmtCurrency(Math.abs(finance.monthNet))} over this month.`);
+  if (!journal.hasWrittenToday) msgs.push('📝 Journal today — even 2 minutes helps!');
+  return msgs.slice(0, 2).join(' ') || `Keep pushing ${name}! Every small action compounds. 🚀`;
+}
+
+// ── Cross-module Insight Engine ─────────────────────────────
+function computeCrossInsights(snap) {
+  const insights = [];
+  const { habits, finance, journal } = snap;
+  const u = usr();
+  if (!u) return insights;
+  const dk = isDk();
+  const greenBg = dk ? '#0d2818' : '#f0fdf4';
+  const redBg   = dk ? '#2d0f0f' : '#fef2f2';
+  const ambBg   = dk ? '#2e1e00' : '#fffbeb';
+  const bluBg   = dk ? '#0d2044' : '#eff6ff';
+  const purBg   = dk ? '#1e0d3d' : '#f5f3ff';
+
+  // Mood vs Habit correlation
+  const journals = u.journals || [];
+  if (journals.length >= 5) {
+    const MOOD_SCORE = { '😊':5,'😌':4,'🔥':5,'😔':2,'😤':1,'😴':2,'🤔':3,'🎉':6,'😄':6,'🤩':7,'🙂':4,'😐':3,'😞':2,'😢':1,'😡':1,'😰':2 };
+    const last14 = Array.from({length: 14}, (_, i) => dStr(addD(new Date(), -i))).reverse();
+    const moodByDate = {};
+    journals.forEach(j => { if (j.mood && MOOD_SCORE[j.mood]) moodByDate[j.date] = MOOD_SCORE[j.mood]; });
+    const tasks = u.tasks || [];
+    const highMoodDays = last14.filter(d => (moodByDate[d] || 0) >= 5);
+    const lowMoodDays  = last14.filter(d => moodByDate[d] && moodByDate[d] <= 2);
+    if (highMoodDays.length >= 2 && tasks.length) {
+      const highHabit = Math.round(highMoodDays.reduce((s, d) => s + tasks.filter(t => u.done[t.id + '_' + d]).length / tasks.length * 100, 0) / highMoodDays.length);
+      const allHabit  = Math.round(last14.reduce((s, d) => s + tasks.filter(t => u.done[t.id + '_' + d]).length / tasks.length * 100, 0) / 14);
+      if (highHabit > allHabit + 15) {
+        insights.push({ icon: '😊', title: 'Mood boosts habits', body: `On your high-mood days you complete ${highHabit}% of habits vs ${allHabit}% average. Good mood = productive day!`, color: '#22c55e', bg: greenBg });
+      }
+    }
+    if (lowMoodDays.length >= 2 && tasks.length) {
+      const lowHabit = Math.round(lowMoodDays.reduce((s, d) => s + tasks.filter(t => u.done[t.id + '_' + d]).length / tasks.length * 100, 0) / lowMoodDays.length);
+      if (lowHabit < 40) {
+        insights.push({ icon: '⚠️', title: 'Low mood = low habits', body: `On low-mood days you only complete ${lowHabit}% of habits. Journaling on tough days might help you stay on track.`, color: '#f97316', bg: ambBg });
+      }
+    }
+  }
+
+  // Spending vs habits
+  if (finance.monthExp > 0 && habits.avgHabit7 < 50) {
+    insights.push({ icon: '💡', title: 'Focus drives finances', body: `Habit completion is ${habits.avgHabit7}% this week. Low discipline correlates with impulse spending. Push habits above 70% to regain control.`, color: '#8b5cf6', bg: purBg });
+  }
+
+  // Streak + savings
+  if (habits.streak >= 5 && finance.monthNet > 0) {
+    insights.push({ icon: '🏆', title: 'Consistency is paying off', body: `${habits.streak}-day habit streak AND positive savings this month — you're in a virtuous cycle!`, color: '#22c55e', bg: greenBg });
+  }
+
+  // Journal streak + mood
+  if (journal.journalStreak >= 3 && journal.recentMoods.length >= 2) {
+    const MOOD_SCORE = { '😊':5,'😌':4,'🔥':5,'😔':2,'😤':1,'😴':2,'🤔':3,'🎉':6,'😄':6,'🤩':7,'🙂':4,'😐':3,'😞':2,'😢':1,'😡':1,'😰':2 };
+    const avgMood = Math.round(journal.recentMoods.slice(0, 5).reduce((s, m) => s + (MOOD_SCORE[m] || 3), 0) / Math.min(journal.recentMoods.length, 5));
+    if (avgMood >= 4) {
+      insights.push({ icon: '📔', title: 'Journaling = better mood', body: `${journal.journalStreak}-day writing streak with avg mood ${avgMood}/7. Regular reflection is working!`, color: '#06b6d4', bg: bluBg });
+    }
+  }
+
+  // Budget alerts
+  if (finance.overBudgetCats.length > 0) {
+    insights.push({ icon: '🚨', title: 'Budget alert', body: `Over budget in ${finance.overBudgetCats.join(', ')}. Cut ${finance.overBudgetCats[0]} by 20% this week to get back on track.`, color: '#ef4444', bg: redBg });
+  }
+
+  return insights.slice(0, 3);
+}
+
+// ── Predictive Finance Engine ───────────────────────────────
+function computeFinancePredictions() {
+  const predictions = [];
+  const u = usr();
+  if (!u) return predictions;
+  const txns = u.transactions || [];
+  if (!txns.length) return predictions;
+  const dk = isDk();
+  const greenBg = dk ? '#0d2818' : '#f0fdf4';
+  const redBg   = dk ? '#2d0f0f' : '#fef2f2';
+  const bluBg   = dk ? '#0d2044' : '#eff6ff';
+
+  const now = new Date();
+  const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+  const dayOfMonth = now.getDate();
+  const daysLeft = daysInMonth - dayOfMonth;
+  const monthStart = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  const monthTxns = txns.filter(t => (t.date || '').startsWith(monthStart));
+  const monthInc = monthTxns.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amt), 0);
+  const monthExp = monthTxns.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amt), 0);
+  const dailyBurn = dayOfMonth > 0 ? monthExp / dayOfMonth : 0;
+  const projectedSav = monthInc - (dailyBurn * daysInMonth);
+
+  // Month end projection
+  if (monthInc > 0) {
+    const onTrack = projectedSav > 0;
+    predictions.push({
+      icon: onTrack ? '📊' : '⚠️',
+      title: onTrack ? `On track to save ${fmtCurrency(Math.round(projectedSav))} this month` : `Projected to overspend by ${fmtCurrency(Math.abs(Math.round(projectedSav)))}`,
+      body: `At your current rate of ${fmtCurrency(Math.round(dailyBurn))}/day with ${daysLeft} days left.`,
+      color: onTrack ? '#22c55e' : '#ef4444',
+      bg: onTrack ? greenBg : redBg
+    });
+  }
+
+  // Category reduction → goal
+  const catMap = {};
+  monthTxns.filter(t => t.type === 'expense').forEach(t => { catMap[t.cat] = (catMap[t.cat] || 0) + Math.abs(t.amt); });
+  const topCat = Object.entries(catMap).sort((a, b) => b[1] - a[1])[0];
+  const goals = getGoals();
+  const activeGoal = goals.find(g => g.saved < g.target);
+  if (topCat && activeGoal) {
+    const reduction = Math.round(topCat[1] * 0.2);
+    predictions.push({
+      icon: '🎯',
+      title: `Reduce ${topCat[0]} by 20% = ${fmtCurrency(reduction)} towards "${activeGoal.name}"`,
+      body: `You've spent ${fmtCurrency(Math.round(topCat[1]))} on ${topCat[0]} this month. Cutting 20% moves you closer to your goal.`,
+      color: '#8b5cf6',
+      bg: dk ? '#1e0d3d' : '#f5f3ff'
+    });
+  }
+
+  // Goal ETA
+  if (activeGoal) {
+    const last90 = txns.filter(t => new Date(t.date + 'T12:00:00') >= addD(now, -90));
+    const l90Inc = last90.filter(t => t.type === 'income').reduce((s, t) => s + Math.abs(t.amt), 0);
+    const l90Exp = last90.filter(t => t.type === 'expense').reduce((s, t) => s + Math.abs(t.amt), 0);
+    const avgMonthlySav = (l90Inc - l90Exp) / 3;
+    if (avgMonthlySav > 0) {
+      const remaining = activeGoal.target - activeGoal.saved;
+      const monthsNeeded = Math.ceil(remaining / avgMonthlySav);
+      predictions.push({
+        icon: '⏱',
+        title: `"${activeGoal.name}" goal in ~${monthsNeeded} month${monthsNeeded > 1 ? 's' : ''}`,
+        body: `At your avg savings of ${fmtCurrency(Math.round(avgMonthlySav))}/month you'll hit ${fmtCurrency(activeGoal.target)}.`,
+        color: '#06b6d4',
+        bg: bluBg
+      });
+    }
+  }
+
+  return predictions.slice(0, 3);
+}
+
+// ══════════════════════════════════════════════════════════
 //  BOOT
 // ══════════════════════════════════════════════════════════
 async function boot() {
@@ -2245,8 +2596,17 @@ function mountApp() {
   wOff = 0;
   selectedTxIds.clear();
 
+  // Inject command center div at top of dashboard
+  const pgDash = document.getElementById('pgDashboard');
+  if (pgDash && !document.getElementById('commandCenter')) {
+    const cc = document.createElement('div');
+    cc.id = 'commandCenter';
+    cc.style.cssText = 'margin-bottom:24px';
+    pgDash.insertBefore(cc, pgDash.firstChild);
+  }
   renderGrid();
   setTimeout(() => renderDisciplineAnalytics(), 800);
+  setTimeout(() => renderCommandCenter(), 1200);
   setSyncState('saved');
 }
 

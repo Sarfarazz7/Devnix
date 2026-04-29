@@ -1279,54 +1279,40 @@ function renderFinOverview() {
   destroyFinChart('revExp');
   const revExpEl = document.getElementById('revExpCh');
   if (revExpEl) {
-    // Cumulative net worth line
-    let cumNet = 0;
-    const cumNetData = sortedMonths.map((_, i) => { cumNet += mInc[i] - mExp[i]; return Math.round(cumNet); });
-
     finCharts.revExp = new Chart(revExpEl, {
+      type: 'line',
       data: {
         labels: mLbls,
         datasets: [
           {
-            type: 'bar',
             label: 'Income',
             data: mInc,
-            backgroundColor: isDk() ? '#1d4ed8bb' : '#3b82f6bb',
-            borderColor: isDk() ? '#1d4ed8' : '#3b82f6',
-            borderWidth: 1.5,
-            borderRadius: 5,
-            borderSkipped: false,
-            yAxisID: 'y',
-            order: 3
-          },
-          {
-            type: 'bar',
-            label: 'Expenses',
-            data: mExp,
-            backgroundColor: isDk() ? '#991b1bbb' : '#ef4444bb',
-            borderColor: isDk() ? '#ef4444' : '#dc2626',
-            borderWidth: 1.5,
-            borderRadius: 5,
-            borderSkipped: false,
-            yAxisID: 'y',
-            order: 2
-          },
-          {
-            type: 'line',
-            label: 'Cumulative net',
-            data: cumNetData,
-            borderColor: '#06b6d4',
-            backgroundColor: 'rgba(6,182,212,0.06)',
-            borderWidth: 2,
-            borderDash: [5, 3],
-            pointRadius: 4,
-            pointBackgroundColor: cumNetData.map(v => v >= 0 ? '#06b6d4' : '#ef4444'),
+            borderColor: '#3b82f6',
+            backgroundColor: 'transparent',
+            borderWidth: 2.5,
+            borderDash: [7, 4],
+            pointRadius: 5,
+            pointBackgroundColor: '#3b82f6',
             pointBorderColor: isDk() ? '#181b24' : '#fff',
             pointBorderWidth: 2,
-            tension: 0.3,
-            fill: false,
-            yAxisID: 'y1',
-            order: 1
+            pointHoverRadius: 7,
+            tension: 0,
+            fill: false
+          },
+          {
+            label: 'Expenses',
+            data: mExp,
+            borderColor: '#ef4444',
+            backgroundColor: 'transparent',
+            borderWidth: 2.5,
+            borderDash: [7, 4],
+            pointRadius: 5,
+            pointBackgroundColor: '#ef4444',
+            pointBorderColor: isDk() ? '#181b24' : '#fff',
+            pointBorderWidth: 2,
+            pointHoverRadius: 7,
+            tension: 0,
+            fill: false
           }
         ]
       },
@@ -1338,28 +1324,36 @@ function renderFinOverview() {
             display: true,
             position: 'top',
             align: 'end',
-            labels: { color: tcFn(), font: { size: 10 }, boxWidth: 12, padding: 10, usePointStyle: true }
-          },
-          tooltip: { callbacks: {
-            label: c => {
-              if (c.datasetIndex === 2) return 'Net: ' + (c.parsed.y >= 0 ? '+' : '') + fmtCurrency(c.parsed.y);
-              return c.dataset.label + ': ' + fmtCurrency(c.parsed.y);
+            labels: {
+              color: tcFn(),
+              font: { size: 10 },
+              boxWidth: 12,
+              padding: 12,
+              usePointStyle: true,
+              pointStyle: 'circle'
             }
-          }}
+          },
+          tooltip: {
+            callbacks: {
+              label: c => c.dataset.label + ': ' + fmtCurrency(c.parsed.y)
+            }
+          }
         },
         scales: {
           x: {
-            ticks: { font: { size: 10 }, color: tcFn() },
-            grid: { display: false }
+            ticks: { font: { size: 10 }, color: tcFn(), maxTicksLimit: 8 },
+            grid: { display: false },
+            border: { display: false }
           },
           y: {
-            ticks: { callback: v => '₹' + (v/1000).toFixed(0) + 'k', font: { size: 10 }, color: tcFn() },
-            grid: { color: gcFn() }
-          },
-          y1: {
-            position: 'right',
-            ticks: { callback: v => (v>=0?'+':'') + '₹' + (v/1000).toFixed(1) + 'k', font: { size: 9 }, color: '#06b6d4' },
-            grid: { display: false }
+            ticks: {
+              callback: v => '₹' + (v >= 1000 ? (v/1000).toFixed(0) + 'k' : v),
+              font: { size: 10 },
+              color: tcFn(),
+              maxTicksLimit: 5
+            },
+            grid: { color: gcFn(), drawBorder: false },
+            border: { display: false }
           }
         }
       }

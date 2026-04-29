@@ -1279,21 +1279,88 @@ function renderFinOverview() {
   destroyFinChart('revExp');
   const revExpEl = document.getElementById('revExpCh');
   if (revExpEl) {
+    // Cumulative net worth line
+    let cumNet = 0;
+    const cumNetData = sortedMonths.map((_, i) => { cumNet += mInc[i] - mExp[i]; return Math.round(cumNet); });
+
     finCharts.revExp = new Chart(revExpEl, {
-      type: 'bar',
       data: {
         labels: mLbls,
         datasets: [
-          { label: 'Income', data: mInc, backgroundColor: isDk() ? '#1d4ed8' : '#3b82f6', borderRadius: 4, borderSkipped: false, order: 2 },
-          { label: 'Expenses', data: mExp, type: 'line', borderColor: '#ef4444', backgroundColor: 'transparent', borderWidth: 2, borderDash: [5, 3], pointRadius: 3, pointBackgroundColor: '#ef4444', tension: .3, order: 1 }
+          {
+            type: 'bar',
+            label: 'Income',
+            data: mInc,
+            backgroundColor: isDk() ? '#1d4ed8bb' : '#3b82f6bb',
+            borderColor: isDk() ? '#1d4ed8' : '#3b82f6',
+            borderWidth: 1.5,
+            borderRadius: 5,
+            borderSkipped: false,
+            yAxisID: 'y',
+            order: 3
+          },
+          {
+            type: 'bar',
+            label: 'Expenses',
+            data: mExp,
+            backgroundColor: isDk() ? '#991b1bbb' : '#ef4444bb',
+            borderColor: isDk() ? '#ef4444' : '#dc2626',
+            borderWidth: 1.5,
+            borderRadius: 5,
+            borderSkipped: false,
+            yAxisID: 'y',
+            order: 2
+          },
+          {
+            type: 'line',
+            label: 'Cumulative net',
+            data: cumNetData,
+            borderColor: '#06b6d4',
+            backgroundColor: 'rgba(6,182,212,0.06)',
+            borderWidth: 2,
+            borderDash: [5, 3],
+            pointRadius: 4,
+            pointBackgroundColor: cumNetData.map(v => v >= 0 ? '#06b6d4' : '#ef4444'),
+            pointBorderColor: isDk() ? '#181b24' : '#fff',
+            pointBorderWidth: 2,
+            tension: 0.3,
+            fill: false,
+            yAxisID: 'y1',
+            order: 1
+          }
         ]
       },
       options: {
-        responsive: true, maintainAspectRatio: false, animation: { duration: 700 },
-        plugins: { legend: { display: false } },
+        responsive: true, maintainAspectRatio: false,
+        animation: { duration: 800, easing: 'easeOutQuart' },
+        plugins: {
+          legend: {
+            display: true,
+            position: 'top',
+            align: 'end',
+            labels: { color: tcFn(), font: { size: 10 }, boxWidth: 12, padding: 10, usePointStyle: true }
+          },
+          tooltip: { callbacks: {
+            label: c => {
+              if (c.datasetIndex === 2) return 'Net: ' + (c.parsed.y >= 0 ? '+' : '') + fmtCurrency(c.parsed.y);
+              return c.dataset.label + ': ' + fmtCurrency(c.parsed.y);
+            }
+          }}
+        },
         scales: {
-          x: { ticks: { font: { size: 10 }, color: tcFn() }, grid: { display: false } },
-          y: { ticks: { callback: v => '₹' + v / 1000 + 'k', font: { size: 10 }, color: tcFn() }, grid: { color: gcFn() } }
+          x: {
+            ticks: { font: { size: 10 }, color: tcFn() },
+            grid: { display: false }
+          },
+          y: {
+            ticks: { callback: v => '₹' + (v/1000).toFixed(0) + 'k', font: { size: 10 }, color: tcFn() },
+            grid: { color: gcFn() }
+          },
+          y1: {
+            position: 'right',
+            ticks: { callback: v => (v>=0?'+':'') + '₹' + (v/1000).toFixed(1) + 'k', font: { size: 9 }, color: '#06b6d4' },
+            grid: { display: false }
+          }
         }
       }
     });

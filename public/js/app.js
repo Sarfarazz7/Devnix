@@ -2718,67 +2718,97 @@ async function renderCommandCenter() {
   const cb = isDk() ? '#13161f' : '#f8fafc';
   const cbr = isDk() ? '#1e2333' : '#e2e8f0';
 
-  el.innerHTML = `
-    <div style="margin-bottom:20px">
-      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-        <div>
-          <div style="font-size:11px;color:var(--tx3);text-transform:uppercase;letter-spacing:.8px">${greeting}</div>
-          <div style="font-size:20px;font-weight:800;color:var(--tx)">${name.charAt(0).toUpperCase() + name.slice(1)} 👋</div>
-        </div>
-        <div style="font-size:11px;color:var(--tx3)">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
-      </div>
+ el.innerHTML = `
+  <div style="margin-bottom:20px">
 
-      <div id="aiCoachCard" style="background:linear-gradient(135deg,${isDk() ? '#1a1040' : '#ede9fe'},${isDk() ? '#0d2044' : '#dbeafe'});border:1px solid ${isDk() ? '#2d1f6e' : '#c4b5fd'};border-radius:16px;padding:18px;margin-bottom:12px">
-        <div style="display:flex;align-items:flex-start;gap:12px">
-          <div style="font-size:28px;flex-shrink:0">🤖</div>
-          <div style="flex:1">
-            <div style="font-size:11px;font-weight:700;color:${isDk() ? '#a78bfa' : '#7c3aed'};letter-spacing:.5px;margin-bottom:6px">AI LIFE COACH</div>
-            <div id="aiCoachText" style="font-size:13px;color:var(--tx2);line-height:1.6">
-              <span style="color:var(--tx3)">✨ Analyzing your day...</span>
-            </div>
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px">
+      <div>
+        <div style="font-size:10px;color:var(--tx3);text-transform:uppercase;letter-spacing:1px;font-weight:600">${greeting}</div>
+        <div style="font-size:22px;font-weight:800;color:var(--tx);letter-spacing:-.4px;line-height:1.2">${name.charAt(0).toUpperCase() + name.slice(1)} 👋</div>
+      </div>
+      <div style="text-align:right">
+        <div style="font-size:11px;color:var(--tx3)">${new Date().toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'})}</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:2px">Devnix Command Center</div>
+      </div>
+    </div>
+
+    <!-- Main grid: AI Coach + 3 KPIs side by side -->
+    <div style="display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:10px;margin-bottom:10px">
+
+      <!-- AI Coach — spans 2 cols -->
+      <div id="aiCoachCard" style="grid-column:span 2;background:${isDk()?'linear-gradient(135deg,#1a1040,#0d1f3c)':'linear-gradient(135deg,#f5f3ff,#eff6ff)'};border:1px solid ${isDk()?'#2d1f6e':'#c4b5fd'};border-radius:14px;padding:16px;display:flex;gap:12px;align-items:flex-start">
+        <div style="width:38px;height:38px;border-radius:10px;background:${isDk()?'rgba(139,92,246,.25)':'rgba(139,92,246,.15)'};display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0">🤖</div>
+        <div style="flex:1;min-width:0">
+          <div style="font-size:9px;font-weight:700;color:${isDk()?'#a78bfa':'#7c3aed'};letter-spacing:1px;text-transform:uppercase;margin-bottom:5px">AI Life Coach</div>
+          <div id="aiCoachText" style="font-size:12px;color:var(--tx2);line-height:1.6">
+            <span style="color:var(--tx3)">✨ Analyzing your day...</span>
           </div>
         </div>
       </div>
 
-      <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin-bottom:12px">
-        <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px;margin-bottom:6px">💪 HABITS TODAY</div>
-          <div style="font-size:24px;font-weight:800;color:${habits.todayPct >= 80 ? '#22c55e' : habits.todayPct >= 50 ? '#f97316' : '#ef4444'}">${habits.todayPct}%</div>
-          <div style="font-size:11px;color:var(--tx3)">${habits.todayDone}/${habits.totalTasks} done · ${habits.streak}d streak</div>
-          <div style="height:3px;background:${isDk() ? '#1e2333' : '#e2e8f0'};border-radius:2px;margin-top:8px">
-            <div style="height:100%;width:${Math.min(habits.todayPct, 100)}%;background:${habits.todayPct >= 80 ? '#22c55e' : habits.todayPct >= 50 ? '#f97316' : '#ef4444'};border-radius:2px;transition:width .8s"></div>
-          </div>
-        </div>
-        <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px;margin-bottom:6px">💰 THIS MONTH</div>
-          <div style="font-size:20px;font-weight:800;color:${finance.monthNet >= 0 ? '#22c55e' : '#ef4444'}">${fmtCurrency(finance.monthNet)}</div>
-          <div style="font-size:11px;color:var(--tx3)">${finance.savingsRate}% savings rate</div>
-          ${finance.overBudgetCats.length ? `<div style="font-size:10px;color:#ef4444;margin-top:4px">⚠ Over: ${finance.overBudgetCats[0]}</div>` : `<div style="font-size:10px;color:#22c55e;margin-top:4px">✓ Budgets on track</div>`}
-        </div>
-        <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
-          <div style="font-size:10px;color:var(--tx3);font-weight:700;letter-spacing:.5px;margin-bottom:6px">📔 JOURNAL</div>
-          <div style="font-size:20px;font-weight:800;color:${journal.hasWrittenToday ? '#22c55e' : '#94a3b8'}">${journal.hasWrittenToday ? 'Written ✓' : 'Not yet'}</div>
-          <div style="font-size:11px;color:var(--tx3)">${journal.journalStreak}d writing streak</div>
-          <div style="font-size:11px;color:var(--tx3);margin-top:2px">Mood: ${journal.recentMoods[0] || '—'}</div>
+      <!-- Habits KPI -->
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:14px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;right:0;bottom:0;width:3px;background:${habits.todayPct>=80?'#22c55e':habits.todayPct>=50?'#f97316':'#ef4444'};border-radius:0 14px 14px 0"></div>
+        <div style="font-size:9px;font-weight:700;color:var(--tx3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">💪 Habits</div>
+        <div style="font-size:26px;font-weight:800;color:${habits.todayPct>=80?'#22c55e':habits.todayPct>=50?'#f97316':'#ef4444'};line-height:1">${habits.todayPct}%</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:4px">${habits.todayDone}/${habits.totalTasks} · ${habits.streak}d 🔥</div>
+        <div style="height:3px;background:${isDk()?'#1e2333':'#e2e8f0'};border-radius:2px;margin-top:8px;overflow:hidden">
+          <div style="height:100%;width:${Math.min(habits.todayPct,100)}%;background:${habits.todayPct>=80?'#22c55e':habits.todayPct>=50?'#f97316':'#ef4444'};border-radius:2px;transition:width .8s"></div>
         </div>
       </div>
+
+      <!-- Finance KPI -->
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:14px;position:relative;overflow:hidden">
+        <div style="position:absolute;top:0;right:0;bottom:0;width:3px;background:${finance.monthNet>=0?'#22c55e':'#ef4444'};border-radius:0 14px 14px 0"></div>
+        <div style="font-size:9px;font-weight:700;color:var(--tx3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:8px">💰 Month</div>
+        <div style="font-size:20px;font-weight:800;color:${finance.monthNet>=0?'#22c55e':'#ef4444'};line-height:1">${fmtCurrency(finance.monthNet)}</div>
+        <div style="font-size:10px;color:var(--tx3);margin-top:4px">${finance.savingsRate}% savings</div>
+        <div style="font-size:9px;margin-top:4px;color:${finance.overBudgetCats.length?'#ef4444':'#22c55e'}">${finance.overBudgetCats.length?'⚠ Over: '+finance.overBudgetCats[0]:'✓ On track'}</div>
+      </div>
+    </div>
+
+    <!-- Insights + Predictions row -->
+    ${(insights.length || predictions.length) ? `
+    <div style="display:grid;grid-template-columns:${insights.length&&predictions.length?'1fr 1fr':'1fr'};gap:10px">
 
       ${insights.length ? `
-      <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px;margin-bottom:12px">
-        <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:10px;letter-spacing:.5px">🧠 CROSS-MODULE INSIGHTS</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          ${insights.map(ins => `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:${ins.bg};border-radius:8px;border-left:3px solid ${ins.color}"><span style="font-size:14px">${ins.icon}</span><div><div style="font-size:12px;font-weight:600;color:${ins.color}">${ins.title}</div><div style="font-size:11px;color:var(--tx3)">${ins.body}</div></div></div>`).join('')}
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:14px">
+        <div style="font-size:9px;font-weight:700;color:var(--tx3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px;display:flex;align-items:center;gap:5px">
+          🧠 Insights
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          ${insights.map(ins=>`
+          <div style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:9px;background:${ins.bg};border-left:2px solid ${ins.color}">
+            <span style="font-size:13px;flex-shrink:0;margin-top:1px">${ins.icon}</span>
+            <div>
+              <div style="font-size:11px;font-weight:600;color:${ins.color};margin-bottom:1px">${ins.title}</div>
+              <div style="font-size:10px;color:var(--tx3);line-height:1.4">${ins.body}</div>
+            </div>
+          </div>`).join('')}
         </div>
       </div>` : ''}
 
       ${predictions.length ? `
-      <div style="background:${cb};border:1px solid ${cbr};border-radius:12px;padding:14px">
-        <div style="font-size:11px;font-weight:700;color:var(--tx2);margin-bottom:10px;letter-spacing:.5px">📈 FINANCIAL PREDICTIONS</div>
-        <div style="display:flex;flex-direction:column;gap:8px">
-          ${predictions.map(p => `<div style="display:flex;align-items:flex-start;gap:10px;padding:8px 10px;background:${p.bg};border-radius:8px"><span style="font-size:14px">${p.icon}</span><div><div style="font-size:12px;font-weight:600;color:${p.color}">${p.title}</div><div style="font-size:11px;color:var(--tx3)">${p.body}</div></div></div>`).join('')}
+      <div style="background:${cb};border:1px solid ${cbr};border-radius:14px;padding:14px">
+        <div style="font-size:9px;font-weight:700;color:var(--tx3);letter-spacing:.8px;text-transform:uppercase;margin-bottom:10px">
+          📈 Predictions
+        </div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          ${predictions.map(p=>`
+          <div style="display:flex;gap:9px;align-items:flex-start;padding:8px 10px;border-radius:9px;background:${p.bg}">
+            <span style="font-size:13px;flex-shrink:0;margin-top:1px">${p.icon}</span>
+            <div>
+              <div style="font-size:11px;font-weight:600;color:${p.color};margin-bottom:1px">${p.title}</div>
+              <div style="font-size:10px;color:var(--tx3);line-height:1.4">${p.body}</div>
+            </div>
+          </div>`).join('')}
         </div>
       </div>` : ''}
-    </div>
+
+    </div>` : ''}
+
+  </div>
   `;
 
   fetchAICoach(snap);

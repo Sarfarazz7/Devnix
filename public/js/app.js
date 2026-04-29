@@ -3037,10 +3037,13 @@ async function boot() {
       return;
     }
 
-    S.user = normaliseUser(user);
-    S.dark = !!(user.dark);
+   // Fetch full user data after login to ensure maps are complete
+    const fullUser = await API.Auth.me();
+    S.user = normaliseUser(fullUser || user);
+    S.dark = !!((fullUser || user).dark);
     applyDark();
-    document.getElementById('splash').classList.add('H');
+
+    toast(isUp ? 'Account created! Welcome to Devnix 🎉' : 'Welcome back! 👋');
     mountApp();
 
   } catch (e) {

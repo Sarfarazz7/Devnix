@@ -1284,15 +1284,14 @@ function renderFinOverview() {
       data: {
         labels: mLbls,
         datasets: [
-          {
-            label: 'Income',
-            data: mInc,
+          {label: 'Net savings',
+            data: sortedMonths.map((_, i) => Math.round(mInc[i] - mExp[i])),
             borderColor: '#3b82f6',
             backgroundColor: 'transparent',
             borderWidth: 2.5,
             borderDash: [7, 4],
             pointRadius: 5,
-            pointBackgroundColor: '#3b82f6',
+            pointBackgroundColor: sortedMonths.map((_, i) => mInc[i] - mExp[i] >= 0 ? '#3b82f6' : '#ef4444'),
             pointBorderColor: isDk() ? '#181b24' : '#fff',
             pointBorderWidth: 2,
             pointHoverRadius: 7,
@@ -1334,8 +1333,8 @@ function renderFinOverview() {
             }
           },
           tooltip: {
-            callbacks: {
-              label: c => c.dataset.label + ': ' + fmtCurrency(c.parsed.y)
+             callbacks: {
+              label: c => 'Net: ' + (c.parsed.y >= 0 ? '+' : '') + fmtCurrency(c.parsed.y)
             }
           }
         },

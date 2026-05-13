@@ -2070,7 +2070,11 @@ async function saveCurrentJournalDraft({ auto = false, notify = false, requireCo
   if (!titleEl || !bodyEl) return true;
 
   const title = (titleEl.value || '').trim();
-  const body = (bodyEl.innerHTML || '').trim();
+  const cleanBody = bodyEl.cloneNode(true);
+  cleanBody.querySelectorAll('.jef-typed-char').forEach(span => {
+    span.replaceWith(document.createTextNode(span.textContent || ''));
+  });
+  const body = (cleanBody.innerHTML || '').trim();
   const plainBody = stripTags(body).trim();
   if (!title && !plainBody) {
     if (requireContent) toast('Write something first!', 'warn');
@@ -2722,6 +2726,35 @@ function renderJournalEditorForm(wrap) {
     const words = ((text.trim().match(/\S+/g)) || []).length;
     wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
   };
+  const unwrapTypedChar = span => {
+    if (!span || !span.parentNode) return;
+    span.replaceWith(document.createTextNode(span.textContent || ''));
+  };
+  const insertAnimatedText = text => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (!bodyInp.contains(range.commonAncestorContainer)) return;
+    range.deleteContents();
+    const span = document.createElement('span');
+    span.className = 'jef-typed-char';
+    span.textContent = text;
+    range.insertNode(span);
+    range.setStartAfter(span);
+    range.collapse(true);
+    sel.removeAllRanges();
+    sel.addRange(range);
+    span._unwrapTimer = setTimeout(() => unwrapTypedChar(span), 380);
+    updateWC();
+    playTypingFx();
+    scheduleJournalAutoSave();
+    saveSelection();
+  };
+  bodyInp.addEventListener('beforeinput', e => {
+    if (e.isComposing || e.inputType !== 'insertText' || !e.data) return;
+    e.preventDefault();
+    insertAnimatedText(e.data);
+  });
   bodyInp.addEventListener('input', updateWC);
   bodyInp.addEventListener('input', playTypingFx);
   bodyInp.addEventListener('input', scheduleJournalAutoSave);

@@ -2034,6 +2034,12 @@ function escHtml(s) {
   return String(s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+function stripTags(html) {
+  const tmp = document.createElement('div');
+  tmp.innerHTML = html;
+  return tmp.textContent || tmp.innerText || '';
+}
+
 function renderJournalPage() {
   const pg = document.getElementById('pgJournal');
   if (!pg) return;
@@ -2111,7 +2117,7 @@ function renderJournalPage() {
       filtered.forEach(entry => {
         const card = document.createElement('div');
         card.className = 'journal-card' + (jState.editId === entry.id ? ' active' : '');
-        card.innerHTML = `<div class="jc-date"><span class="jc-mood">${entry.mood || '📅'}</span>${fmtRelative(entry.date)}</div><div class="jc-title">${escHtml(entry.title || 'Untitled')}</div><div class="jc-preview">${escHtml((entry.body || '').slice(0, 120))}</div><button class="jc-del" data-id="${entry.id}" title="Delete entry">×</button>`;
+        card.innerHTML = `<div class="jc-date"><span class="jc-mood">${entry.mood || '📅'}</span>${fmtRelative(entry.date)}</div><div class="jc-title">${escHtml(entry.title || 'Untitled')}</div><div class="jc-preview">${escHtml(stripTags(entry.body || '').slice(0, 120))}</div><button class="jc-del" data-id="${entry.id}" title="Delete entry">×</button>`;
         card.addEventListener('click', e => {
           if (e.target.classList.contains('jc-del')) return;
           jState.editId = entry.id; jState.mode = 'view'; renderJournalPage();
@@ -2540,13 +2546,161 @@ function renderJournalEditorForm(wrap) {
   const journals = getJournals();
   const existing = isEdit ? journals.find(j => j.id === jState.editId) : null;
 
-  wrap.innerHTML = `<div class="journal-editor-form"><div class="jef-toolbar"><div class="jef-mood-wrap"><span class="jef-mood-lbl">Mood:</span>${MOODS.map(m => `<button class="mood-btn ${jState.selMood === m.e ? 'sel' : ''}" data-mood="${m.e}" title="${m.l}">${m.e}</button>`).join('')}</div><div class="jef-tags">${TAGS.map(t => `<span class="tag-chip ${jState.selTags.includes(t) ? 'sel' : ''}" data-tag="${t}">${t}</span>`).join('')}</div></div><div class="jef-meta"><div class="jef-date-lbl">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div><input class="jef-title-inp" id="jTitleInp" placeholder="Entry title…" value="${escHtml(existing?.title || '')}"/></div><div class="jef-divider"></div><div class="jef-body"><textarea class="jef-body-inp" id="jBodyInp" placeholder="What's on your mind today?…">${escHtml(existing?.body || '')}</textarea></div><div class="jef-footer"><span class="jef-word-count" id="jWC">0 words</span><button class="btn-discard" id="jDiscard">Discard</button><button class="btn-save-journal" id="jSave">${isEdit ? 'Update entry' : 'Save entry'}</button></div></div>`;
+  wrap.innerHTML = `
+    <div class="journal-editor-form">
+      <div class="jef-toolbar">
+        <div class="jef-mood-wrap">
+          <span class="jef-mood-lbl">Mood:</span>
+          ${MOODS.map(m => `<button class="mood-btn ${jState.selMood === m.e ? 'sel' : ''}" data-mood="${m.e}" title="${m.l}">${m.e}</button>`).join('')}
+        </div>
+        <div class="jef-tags">
+          ${TAGS.map(t => `<span class="tag-chip ${jState.selTags.includes(t) ? 'sel' : ''}" data-tag="${t}">${t}</span>`).join('')}
+        </div>
+      </div>
+      
+      <!-- Rich Text Toolbar -->
+      <div class="jef-text-toolbar" id="jefToolbar">
+        <button class="jef-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
+        <button class="jef-tool-btn" data-cmd="italic" title="Italic"><em>I</em></button>
+        <button class="jef-tool-btn" data-cmd="underline" title="Underline"><u>U</u></button>
+        <button class="jef-tool-btn" data-cmd="strikeThrough" title="Strikethrough"><s>S</s></button>
+        <div class="jef-tool-sep"></div>
+        <button class="jef-tool-btn" data-cmd="insertUnorderedList" title="Bullet list">•</button>
+        <button class="jef-tool-btn" data-cmd="insertOrderedList" title="Numbered list">1.</button>
+        <div class="jef-tool-sep"></div>
+        <div class="jef-dropdown" id="jSizeDD">
+          <button class="jef-tool-btn jef-dd-trigger" id="jSizeTrigger" type="button" title="Font size">
+            <span id="jSizeLbl">Size</span><span class="jef-dd-caret">▾</span>
+          </button>
+          <div class="jef-dd-panel" id="jSizePanel">
+            <div class="jef-dd-header">Font Size</div>
+            <button class="jef-size-opt" data-fsize="1"><span style="font-size:10px">Small</span><span class="jef-size-px">10px</span></button>
+            <button class="jef-size-opt" data-fsize="2"><span style="font-size:13px">Medium</span><span class="jef-size-px">13px</span></button>
+            <button class="jef-size-opt active" data-fsize="3"><span style="font-size:16px">Normal</span><span class="jef-size-px">16px</span></button>
+            <button class="jef-size-opt" data-fsize="4"><span style="font-size:18px">Large</span><span class="jef-size-px">18px</span></button>
+            <button class="jef-size-opt" data-fsize="5"><span style="font-size:22px">X-Large</span><span class="jef-size-px">24px</span></button>
+            <button class="jef-size-opt" data-fsize="6"><span style="font-size:28px">Huge</span><span class="jef-size-px">32px</span></button>
+            <button class="jef-size-opt" data-fsize="7"><span style="font-size:36px">Display</span><span class="jef-size-px">48px</span></button>
+          </div>
+        </div>
+        <div class="jef-tool-sep"></div>
+        <div class="jef-dropdown" id="jColorDD">
+          <button class="jef-tool-btn jef-dd-trigger jef-color-trigger" id="jColorTrigger" type="button" title="Text color">
+            <span class="jef-color-letter">A</span>
+            <div class="jef-color-indicator" id="jColorBar" style="background:${isDk() ? '#e2e8f0' : '#1c1c2e'}"></div>
+          </button>
+          <div class="jef-dd-panel jef-dd-color-panel" id="jColorPanel">
+            <div class="jef-dd-header">Text Color</div>
+            <div class="jef-swatch-grid">
+              ${['#1c1c2e','#ef4444','#f97316','#eab308','#22c55e','#14b8a6','#3b82f6','#8b5cf6','#ec4899','#ffffff','#78716c','#dc2626','#ea580c','#ca8a04','#16a34a','#0d9488','#2563eb','#7c3aed','#db2777','#d4d4d4','#d6d3d1','#fca5a5','#fdba74','#fde047','#86efac','#99f6e4','#93c5fd','#c4b5fd','#f9a8d4','#a3a3a3'].map(c => '<button class="jef-swatch" data-color="' + c + '" style="background:' + c + (c==='#ffffff'?';border:1px solid var(--bd)':'') + '" title="' + c + '"></button>').join('')}
+            </div>
+            <div class="jef-custom-color">
+              <span>Custom:</span>
+              <input type="color" id="jColorInp" value="${isDk() ? '#e2e8f0' : '#1c1c2e'}"/>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="jef-meta">
+        <div class="jef-date-lbl">${new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</div>
+        <input class="jef-title-inp" id="jTitleInp" placeholder="Entry title…" value="${escHtml(existing?.title || '')}"/>
+      </div>
+      <div class="jef-divider"></div>
+      <div class="jef-body">
+        <div class="jef-body-inp jef-rich-text" id="jBodyInp" contenteditable="true" placeholder="What's on your mind today?…"></div>
+      </div>
+      <div class="jef-footer">
+        <span class="jef-word-count" id="jWC">0 words</span>
+        <button class="btn-discard" id="jDiscard">Discard</button>
+        <button class="btn-save-journal" id="jSave">${isEdit ? 'Update entry' : 'Save entry'}</button>
+      </div>
+    </div>`;
 
   const bodyInp = wrap.querySelector('#jBodyInp');
+  
+  // Load content
+  if (existing && existing.body) {
+    // If it looks like plain text (no HTML tags), convert newlines to <br>
+    if (!existing.body.includes('<') && !existing.body.includes('>')) {
+      bodyInp.innerHTML = existing.body.replace(/\n/g, '<br>');
+    } else {
+      bodyInp.innerHTML = existing.body;
+    }
+  }
+
   const wc = wrap.querySelector('#jWC');
-  const updateWC = () => { const words = ((bodyInp.value.trim().match(/\S+/g)) || []).length; wc.textContent = words + ' word' + (words !== 1 ? 's' : ''); };
+  const updateWC = () => { 
+    const text = bodyInp.innerText || bodyInp.textContent || '';
+    const words = ((text.trim().match(/\S+/g)) || []).length; 
+    wc.textContent = words + ' word' + (words !== 1 ? 's' : ''); 
+  };
   bodyInp.addEventListener('input', updateWC);
   updateWC();
+
+  // Toolbar: formatting commands
+  wrap.querySelectorAll('.jef-tool-btn[data-cmd]').forEach(btn => {
+    btn.addEventListener('mousedown', e => e.preventDefault());
+    btn.addEventListener('click', () => {
+      document.execCommand(btn.dataset.cmd, false, null);
+      bodyInp.focus();
+    });
+  });
+
+  // Dropdown open/close helper
+  function closeAllDD() { wrap.querySelectorAll('.jef-dd-panel').forEach(p => p.classList.remove('open')); }
+  wrap.querySelectorAll('.jef-dd-trigger').forEach(trigger => {
+    trigger.addEventListener('mousedown', e => e.preventDefault());
+    trigger.addEventListener('click', e => {
+      e.stopPropagation();
+      const panel = trigger.nextElementSibling;
+      const wasOpen = panel.classList.contains('open');
+      closeAllDD();
+      if (!wasOpen) panel.classList.add('open');
+    });
+  });
+  document.addEventListener('click', closeAllDD);
+  wrap.querySelectorAll('.jef-dd-panel').forEach(p => p.addEventListener('click', e => e.stopPropagation()));
+
+  // Font size dropdown
+  const sizeLabels = {1:'Small',2:'Medium',3:'Normal',4:'Large',5:'X-Large',6:'Huge',7:'Display'};
+  wrap.querySelectorAll('.jef-size-opt').forEach(opt => {
+    opt.addEventListener('mousedown', e => e.preventDefault());
+    opt.addEventListener('click', () => {
+      const sz = opt.dataset.fsize;
+      document.execCommand('fontSize', false, sz);
+      wrap.querySelectorAll('.jef-size-opt').forEach(o => o.classList.remove('active'));
+      opt.classList.add('active');
+      const lbl = wrap.querySelector('#jSizeLbl');
+      if (lbl) lbl.textContent = sizeLabels[sz] || 'Size';
+      closeAllDD();
+      bodyInp.focus();
+    });
+  });
+
+  // Color swatch clicks
+  wrap.querySelectorAll('.jef-swatch').forEach(sw => {
+    sw.addEventListener('mousedown', e => e.preventDefault());
+    sw.addEventListener('click', () => {
+      const color = sw.dataset.color;
+      document.execCommand('foreColor', false, color);
+      const bar = wrap.querySelector('#jColorBar');
+      if (bar) bar.style.background = color;
+      const inp = wrap.querySelector('#jColorInp');
+      if (inp) inp.value = color;
+      closeAllDD();
+      bodyInp.focus();
+    });
+  });
+
+  // Custom color picker
+  const colorInp = wrap.querySelector('#jColorInp');
+  if (colorInp) colorInp.addEventListener('input', e => {
+    document.execCommand('foreColor', false, e.target.value);
+    const bar = wrap.querySelector('#jColorBar');
+    if (bar) bar.style.background = e.target.value;
+    bodyInp.focus();
+  });
 
 
   // ── AI Tab Autocomplete ──────────────────────────────────
@@ -2598,7 +2752,8 @@ function renderJournalEditorForm(wrap) {
       e.preventDefault();
       if (ghostText) {
         // Accept
-        bodyInp.value = bodyInp.value.trimEnd() + ' ' + ghostText;
+        const text = bodyInp.innerText || bodyInp.textContent || '';
+        bodyInp.innerHTML = bodyInp.innerHTML.trim() + ' ' + ghostText;
         ghostText = '';
         wc.style.color = '';
         wc.style.maxWidth = '';
@@ -2648,7 +2803,7 @@ function renderJournalEditorForm(wrap) {
     const titleEl = document.getElementById('jTitleInp');
     const bodyEl = document.getElementById('jBodyInp');
     const title = (titleEl ? titleEl.value : '').trim();
-    const body = (bodyEl ? bodyEl.value : '').trim();
+    const body = (bodyEl ? bodyEl.innerHTML : '').trim();
     if (!title && !body) { toast('Write something first!', 'warn'); return; }
     try {
       if (isEdit && existing) {
@@ -2668,9 +2823,10 @@ function renderJournalEditorForm(wrap) {
 }
 
 function renderJournalBookView(wrap, entry) {
-  const wordCount = ((entry.body || '').trim().split(/\s+/).filter(Boolean)).length;
+  const plainBody = stripTags(entry.body || '');
+  const wordCount = (plainBody.trim().split(/\s+/).filter(Boolean)).length;
   const readMins = Math.max(1, Math.ceil(wordCount / 200));
-  wrap.innerHTML = `<div class="journal-book-view"><div class="jbv-head"><button class="jbv-back" id="jbvBack" title="Back to list">‹</button><div class="jbv-meta">${entry.tags && entry.tags.length ? `<div class="jbv-tags">${entry.tags.map(t => `<span class="jbv-tag">${t}</span>`).join('')}</div>` : ''}<div class="jbv-date">${new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${wordCount} words · ${readMins} min read</div></div><div class="jbv-actions"><button class="jbv-edit-btn" id="jbvEdit">✏ Edit</button></div></div><div class="journal-book-page">${entry.mood ? `<div class="jbp-mood">${entry.mood}</div>` : ''}<div class="jbp-title">${escHtml(entry.title || 'Untitled')}</div><div class="jbp-body">${escHtml(entry.body || '').replace(/\n/g, '<br>')}</div><div class="jbp-footer"><span>${entry.updatedAt ? 'Last edited ' + fmtRelative(entry.updatedAt.slice(0, 10)) : 'Written on ' + fmtRelative(entry.date)}</span><span>✍ ${wordCount} words</span></div></div></div>`;
+  wrap.innerHTML = `<div class="journal-book-view"><div class="jbv-head"><button class="jbv-back" id="jbvBack" title="Back to list">‹</button><div class="jbv-meta">${entry.tags && entry.tags.length ? `<div class="jbv-tags">${entry.tags.map(t => `<span class="jbv-tag">${t}</span>`).join('')}</div>` : ''}<div class="jbv-date">${new Date(entry.date + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })} · ${wordCount} words · ${readMins} min read</div></div><div class="jbv-actions"><button class="jbv-edit-btn" id="jbvEdit">✏ Edit</button></div></div><div class="journal-book-page">${entry.mood ? `<div class="jbp-mood">${entry.mood}</div>` : ''}<div class="jbp-title">${escHtml(entry.title || 'Untitled')}</div><div class="jbp-body">${entry.body || ''}</div><div class="jbp-footer"><span>${entry.updatedAt ? 'Last edited ' + fmtRelative(entry.updatedAt.slice(0, 10)) : 'Written on ' + fmtRelative(entry.date)}</span><span>✍ ${wordCount} words</span></div></div></div>`;
   wrap.querySelector('#jbvBack').addEventListener('click', () => { jState.mode = 'list'; jState.editId = null; renderJournalPage(); });
   wrap.querySelector('#jbvEdit').addEventListener('click', () => { jState.mode = 'edit'; jState.selMood = entry.mood || null; jState.selTags = [...(entry.tags || [])]; renderJournalPage(); });
 }

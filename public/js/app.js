@@ -2636,7 +2636,6 @@ function renderJournalEditorForm(wrap) {
           ${TAGS.map(t => `<span class="tag-chip ${jState.selTags.includes(t) ? 'sel' : ''}" data-tag="${t}">${t}</span>`).join('')}
         </div>
       </div>
-      
       <!-- Rich Text Toolbar -->
       <div class="jef-text-toolbar" id="jefToolbar">
         <button class="jef-tool-btn" data-cmd="bold" title="Bold"><strong>B</strong></button>
@@ -2697,7 +2696,6 @@ function renderJournalEditorForm(wrap) {
     </div>`;
 
   const bodyInp = wrap.querySelector('#jBodyInp');
-  
   // Load content
   if (existing && existing.body) {
     // If it looks like plain text (no HTML tags), convert newlines to <br>
@@ -2709,24 +2707,88 @@ function renderJournalEditorForm(wrap) {
   }
 
   const wc = wrap.querySelector('#jWC');
-  const updateWC = () => { 
+  let typingFxTimer = null;
+  let savedRange = null;
+  const playTypingFx = () => {
+    bodyInp.classList.add('typing');
+    wc.classList.remove('pulse');
+    void wc.offsetWidth;
+    wc.classList.add('pulse');
+    clearTimeout(typingFxTimer);
+    typingFxTimer = setTimeout(() => bodyInp.classList.remove('typing'), 700);
+  };
+  const updateWC = () => {
     const text = bodyInp.innerText || bodyInp.textContent || '';
-    const words = ((text.trim().match(/\S+/g)) || []).length; 
-    wc.textContent = words + ' word' + (words !== 1 ? 's' : ''); 
+    const words = ((text.trim().match(/\S+/g)) || []).length;
+    wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
   };
   bodyInp.addEventListener('input', updateWC);
+  bodyInp.addEventListener('input', playTypingFx);
   bodyInp.addEventListener('input', scheduleJournalAutoSave);
   updateWC();
 
   const titleInp = wrap.querySelector('#jTitleInp');
   if (titleInp) titleInp.addEventListener('input', scheduleJournalAutoSave);
 
+  const saveSelection = () => {
+    const sel = window.getSelection();
+    if (!sel || !sel.rangeCount) return;
+    const range = sel.getRangeAt(0);
+    if (bodyInp.contains(range.commonAncestorContainer)) savedRange = range.cloneRange();
+  };
+  const restoreSelection = () => {
+    if (!savedRange) return;
+    const sel = window.getSelection();
+    sel.removeAllRanges();
+    sel.addRange(savedRange);
+  };
+  const flashFormat = (label, color) => {
+    const fxHost = wrap.querySelector('.jef-body');
+    if (!fxHost) return;
+    const fx = document.createElement('span');
+    fx.className = 'jef-format-flash';
+    fx.textContent = label;
+    if (color) fx.style.setProperty('--fx-color', color);
+    fxHost.appendChild(fx);
+    bodyInp.classList.remove('formatting');
+    void bodyInp.offsetWidth;
+    bodyInp.classList.add('formatting');
+    setTimeout(() => fx.remove(), 720);
+    setTimeout(() => bodyInp.classList.remove('formatting'), 520);
+  };
+  const refreshToolbarState = () => {
+    wrap.querySelectorAll('.jef-tool-btn[data-cmd]').forEach(btn => {
+      let on = false;
+      try { on = document.queryCommandState(btn.dataset.cmd); } catch (e) { on = false; }
+      btn.classList.toggle('active', !!on);
+    });
+  };
+  const runEditorCommand = (cmd, value, label, color) => {
+    restoreSelection();
+    document.execCommand(cmd, false, value ?? null);
+    bodyInp.focus();
+    saveSelection();
+    refreshToolbarState();
+    scheduleJournalAutoSave();
+    flashFormat(label || 'Done', color);
+  };
+  bodyInp.addEventListener('keyup', () => { saveSelection(); refreshToolbarState(); });
+  bodyInp.addEventListener('mouseup', () => { saveSelection(); refreshToolbarState(); });
+  bodyInp.addEventListener('focus', saveSelection);
+
   // Toolbar: formatting commands
   wrap.querySelectorAll('.jef-tool-btn[data-cmd]').forEach(btn => {
     btn.addEventListener('mousedown', e => e.preventDefault());
     btn.addEventListener('click', () => {
-      document.execCommand(btn.dataset.cmd, false, null);
-      bodyInp.focus();
+      const labels = {
+        bold: 'Bold',
+        italic: 'Italic',
+        underline: 'Underline',
+        strikeThrough: 'Strike',
+        insertUnorderedList: 'List',
+        insertOrderedList: 'List'
+      };
+      runEditorCommand(btn.dataset.cmd, null, labels[btn.dataset.cmd] || 'Style');
     });
   });
 
@@ -2751,13 +2813,12 @@ function renderJournalEditorForm(wrap) {
     opt.addEventListener('mousedown', e => e.preventDefault());
     opt.addEventListener('click', () => {
       const sz = opt.dataset.fsize;
-      document.execCommand('fontSize', false, sz);
+      runEditorCommand('fontSize', sz, sizeLabels[sz] || 'Size');
       wrap.querySelectorAll('.jef-size-opt').forEach(o => o.classList.remove('active'));
       opt.classList.add('active');
       const lbl = wrap.querySelector('#jSizeLbl');
       if (lbl) lbl.textContent = sizeLabels[sz] || 'Size';
       closeAllDD();
-      bodyInp.focus();
     });
   });
 
@@ -2766,23 +2827,21 @@ function renderJournalEditorForm(wrap) {
     sw.addEventListener('mousedown', e => e.preventDefault());
     sw.addEventListener('click', () => {
       const color = sw.dataset.color;
-      document.execCommand('foreColor', false, color);
+      runEditorCommand('foreColor', color, 'Color', color);
       const bar = wrap.querySelector('#jColorBar');
       if (bar) bar.style.background = color;
       const inp = wrap.querySelector('#jColorInp');
       if (inp) inp.value = color;
       closeAllDD();
-      bodyInp.focus();
     });
   });
 
   // Custom color picker
   const colorInp = wrap.querySelector('#jColorInp');
   if (colorInp) colorInp.addEventListener('input', e => {
-    document.execCommand('foreColor', false, e.target.value);
+    runEditorCommand('foreColor', e.target.value, 'Color', e.target.value);
     const bar = wrap.querySelector('#jColorBar');
     if (bar) bar.style.background = e.target.value;
-    bodyInp.focus();
   });
 
 

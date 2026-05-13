@@ -415,6 +415,50 @@ td:hover .tip{opacity:1}
 .btn-discard{height:34px;padding:0 16px;background:var(--sf2);color:var(--tx2);border:1.5px solid var(--bd);border-radius:8px;font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;transition:all .18s}
 .btn-discard:hover{border-color:var(--bd2);color:var(--tx)}
 
+/* Text Toolbar */
+.jef-text-toolbar{padding:8px 16px;display:flex;align-items:center;gap:6px;border-bottom:1px solid var(--bd);background:var(--sf);flex-shrink:0;flex-wrap:wrap;position:relative;z-index:20}
+.jef-tool-btn{width:30px;height:30px;border-radius:7px;border:1.5px solid var(--bd);background:var(--sf2);cursor:pointer;font-size:12px;display:flex;align-items:center;justify-content:center;transition:all .18s var(--ease);color:var(--tx2);padding:0;font-family:inherit;position:relative}
+.jef-tool-btn:hover{background:var(--sf3);color:var(--tx);border-color:var(--bd2);transform:translateY(-1px)}
+.jef-tool-btn:active{transform:scale(.94)}
+.jef-tool-btn.active{background:var(--pl);color:var(--p);border-color:var(--p)}
+.jef-tool-sep{width:1px;height:20px;background:var(--bd);margin:0 2px;flex-shrink:0}
+
+/* Dropdown system */
+.jef-dropdown{position:relative}
+.jef-dd-trigger{width:auto!important;padding:0 8px!important;gap:4px;min-width:54px}
+.jef-dd-caret{font-size:8px;color:var(--tx3);margin-left:2px;transition:transform .2s}
+.jef-dd-panel{display:none;position:absolute;top:calc(100% + 6px);left:0;background:var(--sf);border:1.5px solid var(--bd);border-radius:12px;box-shadow:0 8px 32px rgba(0,0,0,.15),0 2px 8px rgba(0,0,0,.08);z-index:100;min-width:160px;animation:fadeUp .2s var(--ease);overflow:hidden}
+.jef-dd-panel.open{display:block}
+.jef-dd-header{font-size:10px;font-weight:700;color:var(--tx3);text-transform:uppercase;letter-spacing:.08em;padding:10px 14px 6px;border-bottom:1px solid var(--bd)}
+
+/* Font size options */
+.jef-size-opt{display:flex;align-items:center;justify-content:space-between;width:100%;padding:8px 14px;border:none;background:none;cursor:pointer;color:var(--tx);font-family:inherit;transition:background .12s,color .12s}
+.jef-size-opt:hover{background:var(--pl);color:var(--p)}
+.jef-size-opt.active{background:var(--pl);color:var(--p);font-weight:600}
+.jef-size-opt.active::after{content:'✓';font-size:11px;margin-left:6px}
+.jef-size-px{font-size:10px;color:var(--tx3);font-weight:500;margin-left:auto;padding-left:12px}
+
+/* Color trigger */
+.jef-color-trigger{flex-direction:column!important;gap:2px!important;padding:3px 6px!important;min-width:30px!important;width:30px!important}
+.jef-color-letter{font-weight:800;font-size:13px;line-height:1}
+.jef-color-indicator{width:18px;height:3px;border-radius:2px;transition:background .2s}
+
+/* Color panel */
+.jef-dd-color-panel{min-width:220px;padding-bottom:8px}
+.jef-swatch-grid{display:grid;grid-template-columns:repeat(10,1fr);gap:3px;padding:10px 12px 6px}
+.jef-swatch{width:18px;height:18px;border-radius:4px;border:1.5px solid transparent;cursor:pointer;transition:all .15s;padding:0}
+.jef-swatch:hover{transform:scale(1.25);border-color:var(--tx);box-shadow:0 2px 8px rgba(0,0,0,.2);z-index:2}
+.jef-custom-color{display:flex;align-items:center;gap:8px;padding:4px 12px 2px;font-size:10px;color:var(--tx3);font-weight:600}
+.jef-custom-color input[type="color"]{width:22px;height:22px;padding:0;border:1.5px solid var(--bd);background:none;cursor:pointer;border-radius:5px;overflow:hidden}
+.jef-custom-color input[type="color"]::-webkit-color-swatch-wrapper{padding:1px}
+.jef-custom-color input[type="color"]::-webkit-color-swatch{border:none;border-radius:3px}
+
+/* Contenteditable Editor */
+.jef-rich-text{min-height:320px;outline:none;font-family:Georgia,'Times New Roman',serif;font-size:15px;line-height:1.8;color:var(--tx);white-space:pre-wrap;word-break:break-word}
+.jef-rich-text:empty::before{content:attr(placeholder);color:var(--tx3);font-style:italic}
+.dk .jef-rich-text{color:var(--tx)}
+.dk .jef-dd-panel{box-shadow:0 8px 32px rgba(0,0,0,.4),0 2px 8px rgba(0,0,0,.2)}
+
 /* Book view */
 .journal-book-view{animation:fadeUp .3s var(--ease);overflow-y:auto;flex:1}
 .journal-book-view .jbv-head{padding:20px 28px 0;display:flex;align-items:flex-start;gap:14px}

@@ -2089,7 +2089,7 @@ async function processJournalImages(files) {
     for (const file of files) {
         if (!file.type.startsWith('image/')) continue;
         try {
-            const data = await new Promise((resolve, reject) => {
+            const base64 = await new Promise((resolve, reject) => {
                 const reader = new FileReader();
                 reader.onload = e => {
                     const img = new Image();
@@ -2102,9 +2102,7 @@ async function processJournalImages(files) {
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        const src = canvas.toDataURL('image/jpeg', 0.8);
-                        // Default sticker size: 200px wide, centered roughly
-                        resolve({ src, w: 200, h: Math.round(200 * (height / width)), x: 50, y: 50 });
+                        resolve(canvas.toDataURL('image/jpeg', 0.8));
                     };
                     img.onerror = reject;
                     img.src = e.target.result;
@@ -2112,7 +2110,7 @@ async function processJournalImages(files) {
                 reader.onerror = reject;
                 reader.readAsDataURL(file);
             });
-            results.push(data);
+            results.push(base64);
         } catch (e) { console.error('Image processing failed', e); }
     }
     return results;
@@ -2762,18 +2760,23 @@ function renderJournalEditorForm(wrap) {
         <input class="jef-title-inp" id="jTitleInp" placeholder="Entry title…" value="${escHtml(existing?.title || '')}"/>
       </div>
       <div class="jef-divider"></div>
-      <div class="jef-body" id="jefWorkspace" style="position:relative;min-height:500px">
-        <div class="jef-body-inp jef-rich-text" id="jBodyInp" contenteditable="true" placeholder="What's on your mind today?…"></div>
-        <div id="jStickerLayer" class="j-sticker-layer" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
-      </div>
       
-      <div class="jef-images-section">
-        <div class="jef-images-head">
-          <span class="jef-images-title">📸 Scrapbook Mode</span>
-          <button class="jef-add-img-btn" id="jAddImgBtn" title="Add sticker photos">+ Add Sticker</button>
-          <input type="file" id="jImgInp" multiple accept="image/*" style="display:none"/>
+      <div class="jef-split-body">
+        <div class="jef-main-area">
+          <div class="jef-body">
+            <div class="jef-body-inp jef-rich-text" id="jBodyInp" contenteditable="true" placeholder="What's on your mind today?…"></div>
+          </div>
+        </div>
+        <div class="jef-side-area">
+          <div class="jef-side-head">
+            <span class="jef-side-title">📸 Memories</span>
+            <button class="jef-add-img-btn" id="jAddImgBtn" title="Add memory photos">+ Add</button>
+            <input type="file" id="jImgInp" multiple accept="image/*" style="display:none"/>
+          </div>
+          <div class="jef-side-gallery" id="jSideGallery"></div>
         </div>
       </div>
+      
       <div class="jef-footer">
         <span class="jef-word-count" id="jWC">0 words</span>
         <button class="btn-discard" id="jDiscard">Discard</button>
@@ -2784,7 +2787,6 @@ function renderJournalEditorForm(wrap) {
     const bodyInp = wrap.querySelector('#jBodyInp');
     // Load content
     if (existing && existing.body) {
-        // If it looks like plain text (no HTML tags), convert newlines to <br>
         if (!existing.body.includes('<') && !existing.body.includes('>')) {
             bodyInp.innerHTML = existing.body.replace(/\n/g, '<br>');
         } else {
@@ -2795,6 +2797,7 @@ function renderJournalEditorForm(wrap) {
     const wc = wrap.querySelector('#jWC');
     let typingFxTimer = null;
     let savedRange = null;
+
     const playTypingFx = () => {
         bodyInp.classList.add('typing');
         wc.classList.remove('pulse');
@@ -2803,42 +2806,15 @@ function renderJournalEditorForm(wrap) {
         clearTimeout(typingFxTimer);
         typingFxTimer = setTimeout(() => bodyInp.classList.remove('typing'), 700);
     };
+
     const updateWC = () => {
         const text = bodyInp.innerText || bodyInp.textContent || '';
         const words = ((text.trim().match(/\S+/g)) || []).length;
         wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
     };
-    let newParagraphPending = false;
-    const getCurrentTextBlock = () => {
-        const sel = window.getSelection();
-        if (!sel || !sel.rangeCount) return null;
-        const range = sel.getRangeAt(0);
-        if (!bodyInp.contains(range.commonAncestorContainer)) return null;
-        let node = range.startContainer.nodeType === Node.ELEMENT_NODE
-            ? range.startContainer
-            : range.startContainer.parentElement;
-        while (node && node !== bodyInp) {
-            if (node.matches?.('p,div,li,blockquote,h1,h2,h3,h4,h5,h6')) return node;
-            node = node.parentElement;
-        }
-        return null;
-    };
-    const playNewParagraphFx = () => {
-        if (!newParagraphPending) return;
-        newParagraphPending = false;
-        const block = getCurrentTextBlock();
-        if (!block) return;
-        block.classList.remove('jef-new-paragraph');
-        void block.offsetWidth;
-        block.classList.add('jef-new-paragraph');
-        setTimeout(() => block.classList.remove('jef-new-paragraph'), 520);
-    };
-    bodyInp.addEventListener('keydown', e => {
-        if (e.key === 'Enter') newParagraphPending = true;
-    });
+
     bodyInp.addEventListener('input', updateWC);
     bodyInp.addEventListener('input', playTypingFx);
-    bodyInp.addEventListener('input', playNewParagraphFx);
     bodyInp.addEventListener('input', scheduleJournalAutoSave);
     updateWC();
 
@@ -2857,20 +2833,6 @@ function renderJournalEditorForm(wrap) {
         sel.removeAllRanges();
         sel.addRange(savedRange);
     };
-    const flashFormat = (label, color) => {
-        const fxHost = wrap.querySelector('.jef-body');
-        if (!fxHost) return;
-        const fx = document.createElement('span');
-        fx.className = 'jef-format-flash';
-        fx.textContent = label;
-        if (color) fx.style.setProperty('--fx-color', color);
-        fxHost.appendChild(fx);
-        bodyInp.classList.remove('formatting');
-        void bodyInp.offsetWidth;
-        bodyInp.classList.add('formatting');
-        setTimeout(() => fx.remove(), 720);
-        setTimeout(() => bodyInp.classList.remove('formatting'), 520);
-    };
     const refreshToolbarState = () => {
         wrap.querySelectorAll('.jef-tool-btn[data-cmd]').forEach(btn => {
             let on = false;
@@ -2878,36 +2840,26 @@ function renderJournalEditorForm(wrap) {
             btn.classList.toggle('active', !!on);
         });
     };
-    const runEditorCommand = (cmd, value, label, color) => {
+    const runEditorCommand = (cmd, value) => {
         restoreSelection();
         document.execCommand(cmd, false, value ?? null);
         bodyInp.focus();
         saveSelection();
         refreshToolbarState();
         scheduleJournalAutoSave();
-        flashFormat(label || 'Done', color);
     };
+
     bodyInp.addEventListener('keyup', () => { saveSelection(); refreshToolbarState(); });
     bodyInp.addEventListener('mouseup', () => { saveSelection(); refreshToolbarState(); });
     bodyInp.addEventListener('focus', saveSelection);
 
-    // Toolbar: formatting commands
     wrap.querySelectorAll('.jef-tool-btn[data-cmd]').forEach(btn => {
         btn.addEventListener('mousedown', e => e.preventDefault());
         btn.addEventListener('click', () => {
-            const labels = {
-                bold: 'Bold',
-                italic: 'Italic',
-                underline: 'Underline',
-                strikeThrough: 'Strike',
-                insertUnorderedList: 'List',
-                insertOrderedList: 'List'
-            };
-            runEditorCommand(btn.dataset.cmd, null, labels[btn.dataset.cmd] || 'Style');
+            runEditorCommand(btn.dataset.cmd, null);
         });
     });
 
-    // Dropdown open/close helper
     function closeAllDD() { wrap.querySelectorAll('.jef-dd-panel').forEach(p => p.classList.remove('open')); }
     wrap.querySelectorAll('.jef-dd-trigger').forEach(trigger => {
         trigger.addEventListener('mousedown', e => e.preventDefault());
@@ -2920,15 +2872,13 @@ function renderJournalEditorForm(wrap) {
         });
     });
     document.addEventListener('click', closeAllDD);
-    wrap.querySelectorAll('.jef-dd-panel').forEach(p => p.addEventListener('click', e => e.stopPropagation()));
 
-    // Font size dropdown
     const sizeLabels = { 1: 'Small', 2: 'Medium', 3: 'Normal', 4: 'Large', 5: 'X-Large', 6: 'Huge', 7: 'Display' };
     wrap.querySelectorAll('.jef-size-opt').forEach(opt => {
         opt.addEventListener('mousedown', e => e.preventDefault());
         opt.addEventListener('click', () => {
             const sz = opt.dataset.fsize;
-            runEditorCommand('fontSize', sz, sizeLabels[sz] || 'Size');
+            runEditorCommand('fontSize', sz);
             wrap.querySelectorAll('.jef-size-opt').forEach(o => o.classList.remove('active'));
             opt.classList.add('active');
             const lbl = wrap.querySelector('#jSizeLbl');
@@ -2937,106 +2887,16 @@ function renderJournalEditorForm(wrap) {
         });
     });
 
-    // Color swatch clicks
     wrap.querySelectorAll('.jef-swatch').forEach(sw => {
         sw.addEventListener('mousedown', e => e.preventDefault());
         sw.addEventListener('click', () => {
             const color = sw.dataset.color;
-            runEditorCommand('foreColor', color, 'Color', color);
+            runEditorCommand('foreColor', color);
             const bar = wrap.querySelector('#jColorBar');
             if (bar) bar.style.background = color;
-            const inp = wrap.querySelector('#jColorInp');
-            if (inp) inp.value = color;
             closeAllDD();
         });
     });
-
-    // Custom color picker
-    const colorInp = wrap.querySelector('#jColorInp');
-    if (colorInp) colorInp.addEventListener('input', e => {
-        runEditorCommand('foreColor', e.target.value, 'Color', e.target.value);
-        const bar = wrap.querySelector('#jColorBar');
-        if (bar) bar.style.background = e.target.value;
-    });
-
-
-    // ── AI Tab Autocomplete ──────────────────────────────────
-    let ghostText = '';
-    let isLoadingAI = false;
-
-    async function fetchCompletion() {
-        const text = (bodyInp.innerText || bodyInp.textContent || '').trim();
-        if (!text || isLoadingAI) return;
-        if (text.length < 10) { toast('Write a bit more first!', 'warn'); return; }
-        isLoadingAI = true;
-        wc.textContent = '✨ thinking…';
-        try {
-            const res = await fetch(
-                `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY}`,
-                {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        contents: [{
-                            parts: [{
-                                text:
-                                    'You are a journal writing assistant. Continue this journal entry naturally in the same tone and style. Return ONLY the continuation text (max 1-2 sentences). No explanations, no quotes.\n\nJournal so far:\n' + text
-                            }]
-                        }],
-                        generationConfig: { maxOutputTokens: 60, temperature: 0.7 }
-                    })
-                }
-            );
-            const data = await res.json();
-            ghostText = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-            if (ghostText) {
-                wc.textContent = '↵ Tab to accept: ' + ghostText.slice(0, 50) + (ghostText.length > 50 ? '…' : '');
-                wc.style.color = 'var(--p)';
-                wc.style.maxWidth = '70%';
-                wc.style.overflow = 'hidden';
-                wc.style.textOverflow = 'ellipsis';
-                wc.style.whiteSpace = 'nowrap';
-            } else {
-                updateWC();
-            }
-        } catch (e) {
-            ghostText = '';
-            updateWC();
-        } finally {
-            setTimeout(() => { isLoadingAI = false; }, 3000);
-        }
-    }
-
-    bodyInp.addEventListener('keydown', async e => {
-        if (e.key === 'Tab') {
-            e.preventDefault();
-            if (ghostText) {
-                // Accept
-                const text = bodyInp.innerText || bodyInp.textContent || '';
-                bodyInp.innerHTML = bodyInp.innerHTML.trim() + ' ' + ghostText;
-                ghostText = '';
-                wc.style.color = '';
-                wc.style.maxWidth = '';
-                updateWC();
-                toast('✨ AI suggestion accepted!');
-            } else {
-                await fetchCompletion();
-            }
-        } else if (e.key === 'Escape') {
-            ghostText = '';
-            wc.style.color = '';
-            wc.style.maxWidth = '';
-            updateWC();
-        } else {
-            if (ghostText) {
-                ghostText = '';
-                wc.style.color = '';
-                wc.style.maxWidth = '';
-                updateWC();
-            }
-        }
-    });
-
 
     wrap.querySelectorAll('.mood-btn').forEach(btn => {
         btn.addEventListener('click', () => {
@@ -3068,93 +2928,29 @@ function renderJournalEditorForm(wrap) {
         renderJournalPage();
     });
 
-    // Sticker Logic
+    // Sidebar Gallery Logic
     const imgInp = wrap.querySelector('#jImgInp');
-    const stickerLayer = wrap.querySelector('#jStickerLayer');
+    const sideGallery = wrap.querySelector('#jSideGallery');
     const addImgBtn = wrap.querySelector('#jAddImgBtn');
 
-    const renderStickers = () => {
-        if (!stickerLayer) return;
-        stickerLayer.innerHTML = '';
-        jState.selImages.forEach((data, idx) => {
-            const s = document.createElement('div');
-            s.className = 'j-sticker';
-            s.style.cssText = `position:absolute;left:${data.x}px;top:${data.y}px;width:${data.w}px;height:${data.h}px;z-index:10`;
-            s.innerHTML = `<img src="${data.src}" draggable="false"/><div class="js-handle"></div><button class="js-del">×</button>`;
-            
-            // Interaction logic
-            let isDragging = false, isResizing = false;
-            let startX, startY, startW, startH, startLeft, startTop;
-
-            const onMove = (e) => {
-                const cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-                
-                if (isDragging) {
-                    data.x = startLeft + (cx - startX);
-                    data.y = startTop + (cy - startY);
-                    s.style.left = data.x + 'px';
-                    s.style.top = data.y + 'px';
-                } else if (isResizing) {
-                    data.w = Math.max(50, startW + (cx - startX));
-                    data.h = Math.max(50, startH + (cy - startY));
-                    s.style.width = data.w + 'px';
-                    s.style.height = data.h + 'px';
-                }
-            };
-
-            const onUp = () => {
-                if (isDragging || isResizing) {
-                    isDragging = isResizing = false;
-                    document.removeEventListener('mousemove', onMove);
-                    document.removeEventListener('mouseup', onUp);
-                    document.removeEventListener('touchmove', onMove);
-                    document.removeEventListener('touchend', onUp);
-                    s.classList.remove('active');
-                    scheduleJournalAutoSave();
-                }
-            };
-
-            const onDown = (e) => {
-                if (e.target.classList.contains('js-del')) return;
-                
-                // Professional touch: prevent text selection on PC while dragging
-                if (e.type === 'mousedown') e.preventDefault();
-                
-                const cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
-                const cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;
-                
-                startX = cx; startY = cy;
-                startLeft = data.x; startTop = data.y;
-                startW = data.w; startH = data.h;
-
-                if (e.target.classList.contains('js-handle')) isResizing = true;
-                else isDragging = true;
-
-                s.classList.add('active');
-                
-                // Bring to front without re-rendering everything
-                const all = stickerLayer.querySelectorAll('.j-sticker');
-                all.forEach(el => el.style.zIndex = '10');
-                s.style.zIndex = '100';
-
-                document.addEventListener('mousemove', onMove);
-                document.addEventListener('mouseup', onUp);
-                document.addEventListener('touchmove', onMove, { passive: false });
-                document.addEventListener('touchend', onUp);
-            };
-
-            s.onmousedown = onDown;
-            s.ontouchstart = onDown;
-
-            s.querySelector('.js-del').onclick = (e) => {
+    const renderSideGallery = () => {
+        if (!sideGallery) return;
+        sideGallery.innerHTML = '';
+        if (!jState.selImages.length) {
+            sideGallery.innerHTML = '<div class="jef-side-empty">No photos yet.<br>Click + to add.</div>';
+            return;
+        }
+        jState.selImages.forEach((src, idx) => {
+            const item = document.createElement('div');
+            item.className = 'jef-side-item';
+            item.innerHTML = `<img src="${src}" onclick="openLightbox('${src}')"/><button class="jef-side-del">×</button>`;
+            item.querySelector('.jef-side-del').onclick = (e) => {
                 e.stopPropagation();
                 jState.selImages.splice(idx, 1);
-                renderStickers();
+                renderSideGallery();
                 scheduleJournalAutoSave();
             };
-
-            stickerLayer.appendChild(s);
+            sideGallery.appendChild(item);
         });
     };
 
@@ -3163,17 +2959,17 @@ function renderJournalEditorForm(wrap) {
         imgInp.onchange = async () => {
             if (!imgInp.files.length) return;
             addImgBtn.disabled = true;
-            addImgBtn.textContent = '⌛ Processing…';
-            const stickerDataArray = await processJournalImages(imgInp.files);
-            jState.selImages = [...jState.selImages, ...stickerDataArray];
-            renderStickers();
+            addImgBtn.textContent = '...';
+            const base64s = await processJournalImages(imgInp.files);
+            jState.selImages = [...jState.selImages, ...base64s];
+            renderSideGallery();
             scheduleJournalAutoSave();
             imgInp.value = '';
             addImgBtn.disabled = false;
-            addImgBtn.textContent = '+ Add Sticker';
+            addImgBtn.textContent = '+ Add';
         };
     }
-    renderStickers();
+    renderSideGallery();
 }
 
 function renderJournalBookView(wrap, entry) {
@@ -3192,21 +2988,26 @@ function renderJournalBookView(wrap, entry) {
           <button class="jbv-edit-btn" id="jbvEdit">✏ Edit</button>
         </div>
       </div>
-      <div class="journal-book-page">
-        ${entry.mood ? `<div class="jbp-mood">${entry.mood}</div>` : ''}
-        <div class="jbp-title">${escHtml(entry.title || 'Untitled')}</div>
-        <div class="jbp-body">${entry.body || ''}</div>
-        
+      <div class="jbv-split-view">
+        <div class="jbv-main">
+          <div class="journal-book-page">
+            ${entry.mood ? `<div class="jbp-mood">${entry.mood}</div>` : ''}
+            <div class="jbp-title">${escHtml(entry.title || 'Untitled')}</div>
+            <div class="jbp-body">${entry.body || ''}</div>
+            <div class="jbp-footer">
+              <span>${entry.updatedAt ? 'Last edited ' + fmtRelative(entry.updatedAt.slice(0, 10)) : 'Written on ' + fmtRelative(entry.date)}</span>
+              <span>✍ ${wordCount} words</span>
+            </div>
+          </div>
+        </div>
         ${entry.images && entry.images.length ? `
-          <div class="jbv-scrapbook-area" style="position:relative;margin:20px 0;min-height:300px">
-            ${entry.images.map(s => `<div class="jbv-sticker" style="position:absolute;left:${s.x}px;top:${s.y}px;width:${s.w}px;height:${s.h}px;box-shadow:0 4px 15px rgba(0,0,0,0.1);border-radius:4px;overflow:hidden;cursor:zoom-in" onclick="openLightbox('${s.src}')"><img src="${s.src}" style="width:100%;height:100%;display:block;object-fit:cover"/></div>`).join('')}
+          <div class="jbv-sidebar">
+            <div class="jbv-sidebar-title">MEMORIES</div>
+            <div class="jbv-sidebar-grid">
+              ${entry.images.map(src => `<div class="jbv-sidebar-item" onclick="openLightbox('${src}')"><img src="${src}"/></div>`).join('')}
+            </div>
           </div>
         ` : ''}
-
-        <div class="jbp-footer">
-          <span>${entry.updatedAt ? 'Last edited ' + fmtRelative(entry.updatedAt.slice(0, 10)) : 'Written on ' + fmtRelative(entry.date)}</span>
-          <span>✍ ${wordCount} words</span>
-        </div>
       </div>
     </div>`;
 

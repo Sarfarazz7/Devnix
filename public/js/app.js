@@ -2163,14 +2163,6 @@ async function saveCurrentJournalDraft({ auto = false, notify = false, requireCo
             jState.editId = Array.isArray(journals2) && journals2.length ? journals2[journals2.length - 1]?.id : null;
         }
 
-        console.log('[Journal] Server Response:', journals2);
-        
-        // Truth Alert: Show the user exactly what the server saved
-        const savedEntry = journals2.find(j => j.id === (jState.editId || existing?.id));
-        if (savedEntry) {
-            window.alert('SERVER SAVED: ' + (savedEntry.images ? `Photos found (${savedEntry.images.length})` : 'NO PHOTOS FIELD FOUND! (Server is still old)'));
-        }
-        
         S.user.journals = journals2;
         setSyncState('saved');
         if (notify) toast(auto ? 'Draft auto-saved.' : 'Journal saved!');

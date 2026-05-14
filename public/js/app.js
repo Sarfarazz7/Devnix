@@ -243,6 +243,13 @@ document.querySelectorAll('.nb-btn').forEach(btn => {
   });
 });
 
+function closeAllModals() {
+  ['noteModal', 'editTxModal', 'budgetModal', 'goalModal'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.classList.add('H');
+  });
+}
+
 document.querySelectorAll('.fin-tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.fin-tab').forEach(x => x.classList.remove('on'));
@@ -376,13 +383,13 @@ document.addEventListener('keydown', e => {
   const activeEl = document.activeElement;
   const tag = activeEl ? activeEl.tagName : '';
   const isEditable = activeEl && (
-    tag === 'INPUT' ||
+    activeEl.tagName === 'INPUT' ||
     tag === 'TEXTAREA' ||
     tag === 'SELECT' ||
     activeEl.isContentEditable ||
-    activeEl.closest?.('[contenteditable="true"]')
+    activeEl.closest?.('[contenteditable="true"]') || activeEl.closest?.('.jef-rich-text')
   );
-  if (isEditable) return;
+  if (isEditable || e.ctrlKey || e.metaKey || e.altKey) return;
   const boxes = document.querySelectorAll('.ck');
   if (!boxes.length) return;
   const cols = 7, rows = Math.ceil(boxes.length / cols);
@@ -546,6 +553,7 @@ function openNote(tid, ds, d) {
   noteCtx = { tid, ds };
   document.getElementById('noteTitle').textContent = 'Note — ' + d.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'short' });
   document.getElementById('noteTA').value = u.notes[tid + '_' + ds] || '';
+  closeAllModals();
   document.getElementById('noteModal').classList.remove('H');
   setTimeout(() => { const ta = document.getElementById('noteTA'); if (ta) ta.focus(); }, 50);
 }
@@ -1388,7 +1396,16 @@ function renderFinOverview() {
 
   const insights = [];
   if (savRate >= 40) insights.push({ icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/>', color: '#22c55e', bg: isDk() ? '#0d2818' : '#f0fdf4', title: 'Strong savings rate — ' + savRate + '%', body: 'You\'re saving ' + savRate + '% of your income. Keep it up!' });
-  else if (inc > 0) insights.push({ icon: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>', color: '#f59e0b', bg: isDk() ? '#2e1e00' : '#fffbeb', title: 'Savings rate: ' + savRate + '%', body: 'Target 40% or more. Try reducing your top expense category.' });
+  else if (inc > 0) {
+    insights.push({ icon: '<path d="M1 21h22L12 2 1 21zm12-3h-2v-2h2v2zm0-4h-2v-4h2v4z"/>', color: '#f59e0b', bg: isDk() ? '#2e1e00' : '#fffbeb', title: 'Savings rate: ' + savRate + '%', body: 'Target 40% or more. Try reducing your top expense category.' });
+    const addCatBtn = document.getElementById('addCatBudgetBtn');
+    if (addCatBtn) addCatBtn.onclick = () => {
+      document.getElementById('bmCat').value = 'Food';
+      document.getElementById('bmAmt').value = '';
+      closeAllModals();
+      document.getElementById('budgetModal').classList.remove('H');
+    };
+  }
   if (net < 0) insights.push({ icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/>', color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2', title: 'Spending exceeds income', body: 'You\'re spending ' + fmtCurrency(Math.abs(net)) + ' more than you earn.' });
   const topCat = catKeys.sort((a, b) => catMap[b] - catMap[a])[0];
   if (topCat) insights.push({ icon: '<path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/>', color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff', title: 'Top expense: ' + topCat, body: topCat + ' is ' + Math.round(catMap[topCat] / totalExpCat * 100) + '% of total spend (' + fmtCurrency(catMap[topCat]) + ')' });
@@ -1408,6 +1425,7 @@ function renderFinAnalytics() {
   if (addCatBtn) addCatBtn.onclick = () => {
     document.getElementById('bmCat').value = 'Food';
     document.getElementById('bmAmt').value = '';
+    closeAllModals();
     document.getElementById('budgetModal').classList.remove('H');
     setTimeout(() => document.getElementById('bmAmt')?.focus(), 50);
   };
@@ -1503,6 +1521,7 @@ function refreshAnalyticsCharts(txns) {
           if (e.target.classList.contains('del-cat-btn')) return;
           document.getElementById('bmCat').value = cat;
           document.getElementById('bmAmt').value = budget || '';
+          closeAllModals();
           document.getElementById('budgetModal').classList.remove('H');
           setTimeout(() => document.getElementById('bmAmt')?.focus(), 50);
         });
@@ -1625,6 +1644,7 @@ function openGoalModal(idx) {
   document.getElementById('gmColorPicker')?.querySelectorAll('span').forEach(s => {
     s.style.border = s.dataset.c === _anSelColor ? '2px solid var(--tx)' : '2px solid transparent';
   });
+  closeAllModals();
   document.getElementById('goalModal').classList.remove('H');
   setTimeout(() => document.getElementById('gmName')?.focus(), 50);
 }
@@ -1660,7 +1680,7 @@ async function saveBudget() {
   if (!cat || isNaN(amt) || amt < 0) { toast('Enter a valid amount.', 'warn'); return; }
   try {
     const raw = await API.Budgets.set(cat, amt);
-S.user.budgets = { ...toPlainObj(S.user.budgets), ...toPlainObj(raw) };
+    S.user.budgets = { ...toPlainObj(S.user.budgets), ...toPlainObj(raw) };
     console.log('Budgets after save:', S.user.budgets);
     document.getElementById('budgetModal').classList.add('H');
     refreshAnalyticsCharts(S.user.transactions || []);

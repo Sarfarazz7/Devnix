@@ -1708,7 +1708,19 @@ td:hover .tip {
   animation: fadeUp .25s var(--ease)
 }
 
-.modal-bg{position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;z-index:1000;animation:fadeIn .2s var(--ease)}
+.modal-bg {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, .45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  animation: fadeIn .2s var(--ease)
+}
 
 .modal {
   background: var(--sf);
@@ -2536,7 +2548,16 @@ td:hover .tip {
   color: var(--tx)
 }
 
-.edit-modal{background:var(--sf);border-radius:14px;padding:26px;width:380px;box-shadow:0 12px 48px rgba(0,0,0,.3);animation:fadeUp .25s var(--ease);position:relative;z-index:1001}
+.edit-modal {
+  background: var(--sf);
+  border-radius: 14px;
+  padding: 26px;
+  width: 380px;
+  box-shadow: 0 12px 48px rgba(0, 0, 0, .3);
+  animation: fadeUp .25s var(--ease);
+  position: relative;
+  z-index: 1001
+}
 
 .edit-modal h3 {
   font-size: 14px;
@@ -4662,8 +4683,16 @@ body {
   }
 
   /* Modal */
-  .modal, .edit-modal { width: calc(100vw - 32px) !important; max-width: 400px; padding: 20px 16px; }
-  .modal-bg { padding: 16px; }
+  .modal,
+  .edit-modal {
+    width: calc(100vw - 32px) !important;
+    max-width: 400px;
+    padding: 20px 16px;
+  }
+
+  .modal-bg {
+    padding: 16px;
+  }
 
   /* Heatmap */
   .hm-grid {

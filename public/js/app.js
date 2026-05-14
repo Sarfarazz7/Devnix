@@ -2096,13 +2096,13 @@ async function processJournalImages(files) {
                     img.onload = () => {
                         const canvas = document.createElement('canvas');
                         let width = img.width, height = img.height;
-                        const max = 1000;
+                        const max = 800; // Reduced for better backend compatibility
                         if (width > height && width > max) { height *= max / width; width = max; }
                         else if (height > max) { width *= max / height; height = max; }
                         canvas.width = width; canvas.height = height;
                         const ctx = canvas.getContext('2d');
                         ctx.drawImage(img, 0, 0, width, height);
-                        resolve(canvas.toDataURL('image/jpeg', 0.8));
+                        resolve(canvas.toDataURL('image/jpeg', 0.6)); // Lower quality for smaller payload
                     };
                     img.onerror = reject;
                     img.src = e.target.result;
@@ -2700,6 +2700,11 @@ function renderJournalEditorForm(wrap) {
     const journals = getJournals();
     const existing = isEdit ? journals.find(j => j.id === jState.editId) : null;
 
+    // Safety Load: If editing and temporary images are empty, pull from existing entry
+    if (existing && existing.images && !jState.selImages.length) {
+        jState.selImages = [...existing.images];
+    }
+
     wrap.innerHTML = `
     <div class="journal-editor-form">
       <div class="jef-toolbar">
@@ -2924,7 +2929,8 @@ function renderJournalEditorForm(wrap) {
     wrap.querySelector('#jSave').addEventListener('click', async () => {
         const saved = await saveCurrentJournalDraft({ notify: true, requireContent: true });
         if (!saved) return;
-        jState.mode = 'view'; jState.selMood = null; jState.selTags = []; jState.selImages = [];
+        // Don't clear selImages yet, let the renderJournalPage use them or pull from updated S.user.journals
+        jState.mode = 'view';
         renderJournalPage();
     });
 

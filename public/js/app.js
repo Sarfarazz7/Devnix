@@ -2151,18 +2151,25 @@ async function saveCurrentJournalDraft({ auto = false, notify = false, requireCo
             body,
             mood: jState.selMood,
             tags: jState.selTags,
-            images: jState.selImages
+            images: jState.selImages,
+            photos: jState.selImages // Double-key for backend compatibility
         };
-        console.log('[Journal] Saving payload...', { 
-            imagesCount: payload.images.length, 
-            totalSize: JSON.stringify(payload).length 
-        });
+        console.log('[Journal] Sending Payload:', payload);
 
         if (existing) {
             journals2 = await API.Journals.update(existing.id, payload);
         } else {
             journals2 = await API.Journals.add({ ...payload, date: today() });
             jState.editId = Array.isArray(journals2) && journals2.length ? journals2[journals2.length - 1]?.id : null;
+        }
+
+        console.log('[Journal] Server Response:', journals2);
+        
+        // Check if server actually saved them
+        const savedEntry = journals2.find(j => j.id === (jState.editId || existing?.id));
+        if (savedEntry && (!savedEntry.images || !savedEntry.images.length) && payload.images.length > 0) {
+            console.error('[Journal] CRITICAL: Backend accepted save but DID NOT return images. Your backend schema likely lacks an "images" field.');
+            toast('Warning: Backend did not save your photos. Check database schema.', 'warn');
         }
 
         S.user.journals = journals2;

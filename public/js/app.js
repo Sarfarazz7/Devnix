@@ -2762,9 +2762,9 @@ function renderJournalEditorForm(wrap) {
         <input class="jef-title-inp" id="jTitleInp" placeholder="Entry title…" value="${escHtml(existing?.title || '')}"/>
       </div>
       <div class="jef-divider"></div>
-      <div class="jef-body" id="jefWorkspace" style="position:relative">
+      <div class="jef-body" id="jefWorkspace" style="position:relative;min-height:500px">
         <div class="jef-body-inp jef-rich-text" id="jBodyInp" contenteditable="true" placeholder="What's on your mind today?…"></div>
-        <div id="jStickerLayer" class="j-sticker-layer" style="position:absolute;inset:0;pointer-events:none"></div>
+        <div id="jStickerLayer" class="j-sticker-layer" style="position:absolute;inset:0;pointer-events:none;z-index:100"></div>
       </div>
       
       <div class="jef-images-section">
@@ -3117,6 +3117,9 @@ function renderJournalEditorForm(wrap) {
 
             const onDown = (e) => {
                 if (e.target.classList.contains('js-del')) return;
+                
+                // Professional touch: prevent text selection on PC while dragging
+                if (e.type === 'mousedown') e.preventDefault();
                 
                 const cx = e.type.includes('touch') ? e.touches[0].clientX : e.clientX;
                 const cy = e.type.includes('touch') ? e.touches[0].clientY : e.clientY;

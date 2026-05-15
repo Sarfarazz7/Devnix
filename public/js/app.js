@@ -2887,13 +2887,15 @@ function renderJournalEditorForm(wrap) {
             btn.classList.toggle('active', !!on);
         });
     };
-    const runEditorCommand = (cmd, value) => {
+    const runEditorCommand = (cmd, value, skipSync = false) => {
         restoreSelection();
         document.execCommand(cmd, false, value ?? null);
         bodyInp.focus();
         saveSelection();
-        refreshToolbarState();
-        scheduleJournalAutoSave();
+        if (!skipSync) {
+            refreshToolbarState();
+            scheduleJournalAutoSave();
+        }
     };
 
     bodyInp.addEventListener('keyup', () => { saveSelection(); refreshToolbarState(); });
@@ -2921,10 +2923,11 @@ function renderJournalEditorForm(wrap) {
     document.addEventListener('click', closeAllDD);
 
     let originalFont = '';
+    let previewTimer = null;
+
     const fontTrigger = wrap.querySelector('#jFontTrigger');
     if (fontTrigger) {
         fontTrigger.addEventListener('mousedown', () => {
-            // Capture font before hovering starts
             originalFont = document.queryCommandValue('fontName') || '';
         });
     }
@@ -2932,37 +2935,35 @@ function renderJournalEditorForm(wrap) {
     wrap.querySelectorAll('.jef-font-opt').forEach(opt => {
         opt.addEventListener('mousedown', e => e.preventDefault());
         
-        // Live Preview on Hover
         opt.addEventListener('mouseenter', () => {
-            runEditorCommand('fontName', opt.dataset.font);
+            clearTimeout(previewTimer);
+            previewTimer = setTimeout(() => {
+                runEditorCommand('fontName', opt.dataset.font, true); // skipSync = true
+            }, 30); // Small debounce for performance
         });
 
         opt.addEventListener('click', () => {
+            clearTimeout(previewTimer);
             const font = opt.dataset.font;
             runEditorCommand('fontName', font);
-            originalFont = font; // Update original so it stays permanent
-            
-            // Highlight active font
+            originalFont = font;
             wrap.querySelectorAll('.jef-font-opt').forEach(o => o.classList.remove('active'));
             opt.classList.add('active');
-
             const lbl = wrap.querySelector('#jFontLbl');
             if (lbl) lbl.textContent = opt.textContent.trim();
             closeAllDD();
         });
     });
 
-    // Revert if mouse leaves the dropdown without selection
     const fontPanel = wrap.querySelector('#jFontPanel');
     if (fontPanel) {
         fontPanel.addEventListener('mouseleave', () => {
-            if (originalFont) runEditorCommand('fontName', originalFont);
+            clearTimeout(previewTimer);
+            if (originalFont) runEditorCommand('fontName', originalFont, true);
         });
     }
 
-
     const sizeLabels = { 1: 'Small', 2: 'Medium', 3: 'Normal', 4: 'Large', 5: 'X-Large', 6: 'Huge', 7: 'Display' };
-    // --- Font Size Live Preview ---
     let originalSize = '';
     const sizeTrigger = wrap.querySelector('#jSizeTrigger');
     if (sizeTrigger) {
@@ -2975,13 +2976,17 @@ function renderJournalEditorForm(wrap) {
         opt.addEventListener('mousedown', e => e.preventDefault());
         
         opt.addEventListener('mouseenter', () => {
-            runEditorCommand('fontSize', opt.dataset.fsize);
+            clearTimeout(previewTimer);
+            previewTimer = setTimeout(() => {
+                runEditorCommand('fontSize', opt.dataset.fsize, true);
+            }, 30);
         });
 
         opt.addEventListener('click', () => {
+            clearTimeout(previewTimer);
             const sz = opt.dataset.fsize;
             runEditorCommand('fontSize', sz);
-            originalSize = sz; // Permanent
+            originalSize = sz;
             wrap.querySelectorAll('.jef-size-opt').forEach(o => o.classList.remove('active'));
             opt.classList.add('active');
             const lbl = wrap.querySelector('#jSizeLbl');
@@ -2993,11 +2998,11 @@ function renderJournalEditorForm(wrap) {
     const sizePanel = wrap.querySelector('#jSizePanel');
     if (sizePanel) {
         sizePanel.addEventListener('mouseleave', () => {
-            if (originalSize) runEditorCommand('fontSize', originalSize);
+            clearTimeout(previewTimer);
+            if (originalSize) runEditorCommand('fontSize', originalSize, true);
         });
     }
 
-    // --- Color Live Preview ---
     let originalColor = '';
     const colorTrigger = wrap.querySelector('#jColorTrigger');
     if (colorTrigger) {
@@ -3010,13 +3015,17 @@ function renderJournalEditorForm(wrap) {
         sw.addEventListener('mousedown', e => e.preventDefault());
         
         sw.addEventListener('mouseenter', () => {
-            runEditorCommand('foreColor', sw.dataset.color);
+            clearTimeout(previewTimer);
+            previewTimer = setTimeout(() => {
+                runEditorCommand('foreColor', sw.dataset.color, true);
+            }, 30);
         });
 
         sw.addEventListener('click', () => {
+            clearTimeout(previewTimer);
             const color = sw.dataset.color;
             runEditorCommand('foreColor', color);
-            originalColor = color; // Permanent
+            originalColor = color;
             const bar = wrap.querySelector('#jColorBar');
             if (bar) bar.style.background = color;
             closeAllDD();
@@ -3026,8 +3035,9 @@ function renderJournalEditorForm(wrap) {
     const colorPanel = wrap.querySelector('#jColorPanel');
     if (colorPanel) {
         colorPanel.addEventListener('mouseleave', () => {
+            clearTimeout(previewTimer);
             if (originalColor) {
-                runEditorCommand('foreColor', originalColor);
+                runEditorCommand('foreColor', originalColor, true);
                 const bar = wrap.querySelector('#jColorBar');
                 if (bar) bar.style.background = originalColor;
             }

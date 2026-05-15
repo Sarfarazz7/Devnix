@@ -3393,6 +3393,19 @@ td:hover .tip {
   color: var(--p)
 }
 
+.jef-font-opt.active {
+  background: var(--pl);
+  color: var(--p);
+  font-weight: 600
+}
+
+.jef-font-opt.active::after {
+  content: '✓';
+  float: right;
+  font-size: 11px;
+  margin-top: 2px
+}
+
 /* Color trigger */
 .jef-color-trigger {
   flex-direction: column !important;

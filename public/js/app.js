@@ -2962,11 +2962,26 @@ function renderJournalEditorForm(wrap) {
 
 
     const sizeLabels = { 1: 'Small', 2: 'Medium', 3: 'Normal', 4: 'Large', 5: 'X-Large', 6: 'Huge', 7: 'Display' };
+    // --- Font Size Live Preview ---
+    let originalSize = '';
+    const sizeTrigger = wrap.querySelector('#jSizeTrigger');
+    if (sizeTrigger) {
+        sizeTrigger.addEventListener('mousedown', () => {
+            originalSize = document.queryCommandValue('fontSize') || '';
+        });
+    }
+
     wrap.querySelectorAll('.jef-size-opt').forEach(opt => {
         opt.addEventListener('mousedown', e => e.preventDefault());
+        
+        opt.addEventListener('mouseenter', () => {
+            runEditorCommand('fontSize', opt.dataset.fsize);
+        });
+
         opt.addEventListener('click', () => {
             const sz = opt.dataset.fsize;
             runEditorCommand('fontSize', sz);
+            originalSize = sz; // Permanent
             wrap.querySelectorAll('.jef-size-opt').forEach(o => o.classList.remove('active'));
             opt.classList.add('active');
             const lbl = wrap.querySelector('#jSizeLbl');
@@ -2975,16 +2990,49 @@ function renderJournalEditorForm(wrap) {
         });
     });
 
+    const sizePanel = wrap.querySelector('#jSizePanel');
+    if (sizePanel) {
+        sizePanel.addEventListener('mouseleave', () => {
+            if (originalSize) runEditorCommand('fontSize', originalSize);
+        });
+    }
+
+    // --- Color Live Preview ---
+    let originalColor = '';
+    const colorTrigger = wrap.querySelector('#jColorTrigger');
+    if (colorTrigger) {
+        colorTrigger.addEventListener('mousedown', () => {
+            originalColor = document.queryCommandValue('foreColor') || '';
+        });
+    }
+
     wrap.querySelectorAll('.jef-swatch').forEach(sw => {
         sw.addEventListener('mousedown', e => e.preventDefault());
+        
+        sw.addEventListener('mouseenter', () => {
+            runEditorCommand('foreColor', sw.dataset.color);
+        });
+
         sw.addEventListener('click', () => {
             const color = sw.dataset.color;
             runEditorCommand('foreColor', color);
+            originalColor = color; // Permanent
             const bar = wrap.querySelector('#jColorBar');
             if (bar) bar.style.background = color;
             closeAllDD();
         });
     });
+
+    const colorPanel = wrap.querySelector('#jColorPanel');
+    if (colorPanel) {
+        colorPanel.addEventListener('mouseleave', () => {
+            if (originalColor) {
+                runEditorCommand('foreColor', originalColor);
+                const bar = wrap.querySelector('#jColorBar');
+                if (bar) bar.style.background = originalColor;
+            }
+        });
+    }
 
     const colorInp = wrap.querySelector('#jColorInp');
     if (colorInp) {

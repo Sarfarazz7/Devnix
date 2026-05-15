@@ -2920,16 +2920,46 @@ function renderJournalEditorForm(wrap) {
     });
     document.addEventListener('click', closeAllDD);
 
+    let originalFont = '';
+    const fontTrigger = wrap.querySelector('#jFontTrigger');
+    if (fontTrigger) {
+        fontTrigger.addEventListener('mousedown', () => {
+            // Capture font before hovering starts
+            originalFont = document.queryCommandValue('fontName') || '';
+        });
+    }
+
     wrap.querySelectorAll('.jef-font-opt').forEach(opt => {
         opt.addEventListener('mousedown', e => e.preventDefault());
+        
+        // Live Preview on Hover
+        opt.addEventListener('mouseenter', () => {
+            runEditorCommand('fontName', opt.dataset.font);
+        });
+
         opt.addEventListener('click', () => {
             const font = opt.dataset.font;
             runEditorCommand('fontName', font);
+            originalFont = font; // Update original so it stays permanent
+            
+            // Highlight active font
+            wrap.querySelectorAll('.jef-font-opt').forEach(o => o.classList.remove('active'));
+            opt.classList.add('active');
+
             const lbl = wrap.querySelector('#jFontLbl');
             if (lbl) lbl.textContent = opt.textContent.trim();
             closeAllDD();
         });
     });
+
+    // Revert if mouse leaves the dropdown without selection
+    const fontPanel = wrap.querySelector('#jFontPanel');
+    if (fontPanel) {
+        fontPanel.addEventListener('mouseleave', () => {
+            if (originalFont) runEditorCommand('fontName', originalFont);
+        });
+    }
+
 
     const sizeLabels = { 1: 'Small', 2: 'Medium', 3: 'Normal', 4: 'Large', 5: 'X-Large', 6: 'Huge', 7: 'Display' };
     wrap.querySelectorAll('.jef-size-opt').forEach(opt => {

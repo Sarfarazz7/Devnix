@@ -2857,14 +2857,18 @@ function renderJournalEditorForm(wrap) {
     };
 
     const updateWC = () => {
-        const text = bodyInp.innerText || bodyInp.textContent || '';
+        if (isExecutingPreview) return;
+        const text = bodyInp.textContent || '';
         const words = ((text.trim().match(/\S+/g)) || []).length;
         wc.textContent = words + ' word' + (words !== 1 ? 's' : '');
     };
 
-    bodyInp.addEventListener('input', updateWC);
-    bodyInp.addEventListener('input', playTypingFx);
-    bodyInp.addEventListener('input', scheduleJournalAutoSave);
+    bodyInp.addEventListener('input', () => {
+        if (isExecutingPreview) return;
+        updateWC();
+        playTypingFx();
+        scheduleJournalAutoSave();
+    });
     updateWC();
 
     const titleInp = wrap.querySelector('#jTitleInp');
@@ -2895,9 +2899,7 @@ function renderJournalEditorForm(wrap) {
         document.execCommand(cmd, false, value ?? null);
         if (isPreview) isExecutingPreview = false;
 
-        if (isPreview) {
-            bodyInp.focus({ preventScroll: true });
-        } else {
+        if (!isPreview) {
             bodyInp.focus();
             saveSelection();
             refreshToolbarState();
@@ -2945,8 +2947,8 @@ function renderJournalEditorForm(wrap) {
         opt.addEventListener('mouseenter', () => {
             clearTimeout(previewTimer);
             previewTimer = setTimeout(() => {
-                runEditorCommand('fontName', opt.dataset.font, true); // skipSync = true
-            }, 50); // Increased debounce
+                runEditorCommand('fontName', opt.dataset.font, true);
+            }, 80); // Increased debounce for stability
         });
 
         opt.addEventListener('click', () => {
@@ -2986,7 +2988,7 @@ function renderJournalEditorForm(wrap) {
             clearTimeout(previewTimer);
             previewTimer = setTimeout(() => {
                 runEditorCommand('fontSize', opt.dataset.fsize, true);
-            }, 50);
+            }, 80);
         });
 
         opt.addEventListener('click', () => {
@@ -3032,7 +3034,7 @@ function renderJournalEditorForm(wrap) {
             clearTimeout(previewTimer);
             previewTimer = setTimeout(() => {
                 runEditorCommand('foreColor', sw.dataset.color, true);
-            }, 50); // Increased debounce
+            }, 80);
         });
 
         sw.addEventListener('click', () => {

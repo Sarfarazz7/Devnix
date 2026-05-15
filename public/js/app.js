@@ -1332,39 +1332,25 @@ function renderFinOverview() {
     const revExpEl = document.getElementById('revExpCh');
     if (revExpEl) {
         finCharts.revExp = new Chart(revExpEl, {
-            type: 'line',
+            type: 'bar',
             data: {
                 labels: mLbls,
                 datasets: [
                     {
-                        label: 'Net savings',
-                        data: sortedMonths.map((_, i) => Math.round(mInc[i] - mExp[i])),
-                        borderColor: '#3b82f6',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2.5,
-                        borderDash: [7, 4],
-                        pointRadius: 5,
-                        pointBackgroundColor: sortedMonths.map((_, i) => mInc[i] - mExp[i] >= 0 ? '#3b82f6' : '#ef4444'),
-                        pointBorderColor: isDk() ? '#181b24' : '#fff',
-                        pointBorderWidth: 2,
-                        pointHoverRadius: 7,
-                        tension: 0,
-                        fill: false
+                        label: 'Income',
+                        data: mInc,
+                        backgroundColor: '#22c55e',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        barThickness: 12
                     },
                     {
                         label: 'Expenses',
                         data: mExp,
-                        borderColor: '#ef4444',
-                        backgroundColor: 'transparent',
-                        borderWidth: 2.5,
-                        borderDash: [7, 4],
-                        pointRadius: 5,
-                        pointBackgroundColor: '#ef4444',
-                        pointBorderColor: isDk() ? '#181b24' : '#fff',
-                        pointBorderWidth: 2,
-                        pointHoverRadius: 7,
-                        tension: 0,
-                        fill: false
+                        backgroundColor: '#ef4444',
+                        borderRadius: 6,
+                        borderSkipped: false,
+                        barThickness: 12
                     }
                 ]
             },
@@ -1387,7 +1373,7 @@ function renderFinOverview() {
                     },
                     tooltip: {
                         callbacks: {
-                            label: c => 'Net: ' + (c.parsed.y >= 0 ? '+' : '') + fmtCurrency(c.parsed.y)
+                            label: c => c.dataset.label + ': ' + fmtCurrency(c.parsed.y)
                         }
                     }
                 },

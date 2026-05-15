@@ -2887,12 +2887,12 @@ function renderJournalEditorForm(wrap) {
             btn.classList.toggle('active', !!on);
         });
     };
-    const runEditorCommand = (cmd, value, skipSync = false) => {
+    const runEditorCommand = (cmd, value, isPreview = false) => {
         restoreSelection();
         document.execCommand(cmd, false, value ?? null);
-        bodyInp.focus();
-        saveSelection();
-        if (!skipSync) {
+        if (!isPreview) {
+            bodyInp.focus();
+            saveSelection();
             refreshToolbarState();
             scheduleJournalAutoSave();
         }
@@ -2939,7 +2939,7 @@ function renderJournalEditorForm(wrap) {
             clearTimeout(previewTimer);
             previewTimer = setTimeout(() => {
                 runEditorCommand('fontName', opt.dataset.font, true); // skipSync = true
-            }, 30); // Small debounce for performance
+            }, 50); // Increased debounce
         });
 
         opt.addEventListener('click', () => {
@@ -2979,7 +2979,7 @@ function renderJournalEditorForm(wrap) {
             clearTimeout(previewTimer);
             previewTimer = setTimeout(() => {
                 runEditorCommand('fontSize', opt.dataset.fsize, true);
-            }, 30);
+            }, 50);
         });
 
         opt.addEventListener('click', () => {
@@ -3007,7 +3007,11 @@ function renderJournalEditorForm(wrap) {
     const colorTrigger = wrap.querySelector('#jColorTrigger');
     if (colorTrigger) {
         colorTrigger.addEventListener('mousedown', () => {
-            originalColor = document.queryCommandValue('foreColor') || '';
+            originalColor = document.queryCommandValue('foreColor');
+            // If it returns a number (old IE/Webkit), convert or handle it
+            if (typeof originalColor === 'number') {
+                originalColor = '#' + originalColor.toString(16).padStart(6, '0');
+            }
         });
     }
 
@@ -3018,7 +3022,7 @@ function renderJournalEditorForm(wrap) {
             clearTimeout(previewTimer);
             previewTimer = setTimeout(() => {
                 runEditorCommand('foreColor', sw.dataset.color, true);
-            }, 30);
+            }, 50); // Increased debounce
         });
 
         sw.addEventListener('click', () => {
@@ -3036,10 +3040,10 @@ function renderJournalEditorForm(wrap) {
     if (colorPanel) {
         colorPanel.addEventListener('mouseleave', () => {
             clearTimeout(previewTimer);
-            if (originalColor) {
+            if (originalColor !== undefined) {
                 runEditorCommand('foreColor', originalColor, true);
                 const bar = wrap.querySelector('#jColorBar');
-                if (bar) bar.style.background = originalColor;
+                if (bar) bar.style.background = originalColor || (isDk() ? '#e2e8f0' : '#1c1c2e');
             }
         });
     }

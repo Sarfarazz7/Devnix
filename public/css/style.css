@@ -1979,6 +1979,11 @@ td:hover .tip {
   transform: translateY(-1px);
 }
 
+#finMonthPick.is-current {
+  border-color: var(--pm);
+  box-shadow: 0 0 12px rgba(76, 175, 80, 0.25);
+}
+
 #finMonthPick::-webkit-calendar-picker-indicator {
   cursor: pointer;
   filter: var(--dk-filter, none);

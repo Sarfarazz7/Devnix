@@ -20,7 +20,7 @@
 
 // ── Global state ──────────────────────────────────────────
 const GEMINI_KEY_COACH = '';
-let S = { user: null, dark: false };
+let S = { user: null, dark: false, finMonth: new Date().toISOString().slice(0, 7) };
 let wOff = 0, barCI = null, lineCI = null, analyDays = 14;
 let dragActive = false, dragVal = false;
 let noteCtx = { tid: null, ds: null };
@@ -235,6 +235,7 @@ document.querySelectorAll('.nb-btn').forEach(btn => {
             setTimeout(() => renderCommandCenter(), 100);
         } else if (pg === 'finance') {
             document.getElementById('pgFinance').classList.remove('H');
+            ensureFinMonthSelector();
             setTimeout(() => renderFinOverview(), 80);
         } else if (pg === 'journal') {
             document.getElementById('pgJournal').classList.remove('H');
@@ -249,6 +250,24 @@ document.querySelectorAll('.nb-btn').forEach(btn => {
         }
     });
 });
+
+function ensureFinMonthSelector() {
+    const bar = document.querySelector('.fin-subtabs');
+    if (bar && !document.getElementById('finMonthPick')) {
+        const wrap = document.createElement('div');
+        wrap.style.cssText = 'margin-left:auto; display:flex; align-items:center; padding-right:10px;';
+        wrap.innerHTML = `
+            <span style="font-size:10px; color:var(--tx3); margin-right:8px; font-weight:700; letter-spacing:0.5px;">VIEWING:</span>
+            <input type="month" id="finMonthPick" class="f-sel2" value="${S.finMonth}" style="width:130px; cursor:pointer;"/>
+        `;
+        bar.appendChild(wrap);
+        document.getElementById('finMonthPick').onchange = (e) => {
+            S.finMonth = e.target.value;
+            const active = document.querySelector('.fin-tab.on');
+            if (active) active.click();
+        };
+    }
+}
 
 function closeAllModals() {
     ['noteModal', 'editTxModal', 'budgetModal', 'goalModal'].forEach(id => {
@@ -1262,9 +1281,9 @@ function renderFinOverview() {
     const txns = u.transactions || [];
     const hasData = txns.length > 0;
 
-    const now = new Date();
-    const curMonthKey = now.toISOString().slice(0, 7);
-    const lastMonthDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    const selDate = new Date(S.finMonth + '-01T12:00:00');
+    const curMonthKey = S.finMonth;
+    const lastMonthDate = new Date(selDate.getFullYear(), selDate.getMonth() - 1, 1);
     const lastMonthKey = lastMonthDate.toISOString().slice(0, 7);
     const lastMonthName = lastMonthDate.toLocaleString('en-US', { month: 'long' });
 
@@ -1280,14 +1299,14 @@ function renderFinOverview() {
         { 
             label: 'Money In (This Month)', 
             val: fmtCurrency(cur.inc), 
-            sub: `Total earnings for ${now.toLocaleString('en-US', { month: 'long' })}`, 
+            sub: `Total earnings for ${selDate.toLocaleString('en-US', { month: 'long' })}`, 
             pos: true, color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff', 
             icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>' 
         },
         { 
             label: 'Money Out (This Month)', 
             val: fmtCurrency(cur.exp), 
-            sub: `Total spending for ${now.toLocaleString('en-US', { month: 'long' })}`, 
+            sub: `Total spending for ${selDate.toLocaleString('en-US', { month: 'long' })}`, 
             pos: false, color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2', 
             icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3-3h-2v-4z"/>' 
         },
@@ -1475,10 +1494,10 @@ function renderFinAnalytics() {
 }
 
 function refreshAnalyticsCharts(txns) {
-    const now = new Date();
+    const selDate = new Date(S.finMonth + '-01T12:00:00');
     const monthLabels = [], mInc = [], mExp = [];
     for (let i = 11; i >= 0; i--) {
-        const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const d = new Date(selDate.getFullYear(), selDate.getMonth() - i, 1);
         monthLabels.push(d.toLocaleString('en-US', { month: 'short' }));
         const mTx = txns.filter(t => {
             const td = new Date(t.date + 'T12:00:00');
@@ -1513,7 +1532,7 @@ function refreshAnalyticsCharts(txns) {
 
     // Category list
     const catMap = {};
-    txns.filter(t => t.type === 'expense').forEach(t => { catMap[t.cat] = (catMap[t.cat] || 0) + Math.abs(t.amt); });
+    txns.filter(t => t.type === 'expense' && (t.date || '').startsWith(S.finMonth)).forEach(t => { catMap[t.cat] = (catMap[t.cat] || 0) + Math.abs(t.amt); });
     const budgets = getBudgets();
     const catKeys = [...new Set([...Object.keys(catMap), ...Object.keys(budgets)])];
     const totalExp = catKeys.reduce((s, k) => s + (catMap[k] || 0), 0);
@@ -1872,6 +1891,7 @@ function renderTxTable() {
     let rows = txns.filter(t =>
         (cat === 'all' || t.cat === cat) &&
         (type === 'all' || t.type === type) &&
+        (t.date && t.date.startsWith(S.finMonth)) &&
         ((t.name || '').toLowerCase().includes(search) || (t.cat || '').toLowerCase().includes(search))
     );
 
@@ -1961,31 +1981,29 @@ function renderTxTable() {
 function renderWeeklyReview() {
     const u = usr(); if (!u) return;
     const txns = u.transactions || [];
-    const now = new Date();
-    const weekStart = new Date(now);
-    weekStart.setDate(now.getDate() - 7);
-    const weekTxns = txns.filter(t => new Date(t.date + 'T12:00:00') >= weekStart);
-    const weekInc = weekTxns.filter(t => t.amt > 0).reduce((s, t) => s + t.amt, 0);
-    const weekExp = weekTxns.filter(t => t.amt < 0).reduce((s, t) => s + Math.abs(t.amt), 0);
+    const selDate = new Date(S.finMonth + '-01T12:00:00');
+    const monthTxns = txns.filter(t => t.date && t.date.startsWith(S.finMonth));
+    const weekInc = monthTxns.filter(t => t.amt > 0).reduce((s, t) => s + t.amt, 0);
+    const weekExp = monthTxns.filter(t => t.amt < 0).reduce((s, t) => s + Math.abs(t.amt), 0);
     const weekNet = weekInc - weekExp;
 
     const wrSub = document.getElementById('wrSubtitle');
-    if (wrSub) wrSub.textContent = `Summary for ${weekStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })} – ${now.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}`;
+    if (wrSub) wrSub.textContent = `Summary for ${selDate.toLocaleString('en-US', { month: 'long', year: 'numeric' })}`;
 
     const wrGrid = document.getElementById('wrGrid');
     if (wrGrid) wrGrid.innerHTML = [
-        { label: 'Week income', val: '₹' + weekInc.toFixed(0), color: '#22c55e' },
-        { label: 'Week expenses', val: '₹' + weekExp.toFixed(0), color: '#ef4444' },
-        { label: 'Net this week', val: (weekNet >= 0 ? '+' : '') + ('₹' + Math.abs(weekNet).toFixed(0)), color: weekNet >= 0 ? '#22c55e' : '#ef4444' },
-        { label: 'Transactions', val: weekTxns.length, color: '#3b82f6' }
+        { label: 'Month income', val: '₹' + weekInc.toFixed(0), color: '#22c55e' },
+        { label: 'Month expenses', val: '₹' + weekExp.toFixed(0), color: '#ef4444' },
+        { label: 'Net savings', val: (weekNet >= 0 ? '+' : '') + ('₹' + Math.abs(weekNet).toFixed(0)), color: weekNet >= 0 ? '#22c55e' : '#ef4444' },
+        { label: 'Transactions', val: monthTxns.length, color: '#3b82f6' }
     ].map(i => `<div class="wr-item" style="border-color:${i.color}"><div class="wr-item-label">${i.label}</div><div class="wr-item-val" style="color:${i.color}">${i.val}</div></div>`).join('');
 
     const suggestions = [
-        weekExp > weekInc * 0.7 ? { icon: '⚠️', msg: 'Expenses are above 70% of income this week.', color: '#f59e0b' } : null,
-        weekNet < 0 ? { icon: '🔴', msg: 'You spent more than you earned this week.', color: '#ef4444' } : null,
-        weekNet > 1000 ? { icon: '✅', msg: 'Great week! You saved ₹' + weekNet.toFixed(0) + '. Consider moving the surplus to a savings goal.', color: '#22c55e' } : null,
+        weekExp > weekInc * 0.7 ? { icon: '⚠️', msg: 'Expenses are above 70% of income this month.', color: '#f59e0b' } : null,
+        weekNet < 0 ? { icon: '🔴', msg: 'You spent more than you earned this month.', color: '#ef4444' } : null,
+        weekNet > 1000 ? { icon: '✅', msg: 'Great month! You saved ₹' + weekNet.toFixed(0) + '. Consider moving the surplus to a savings goal.', color: '#22c55e' } : null,
         { icon: '💡', msg: 'Set a daily spending limit to stay on track. Try the 24-hour rule before non-essential purchases.', color: '#3b82f6' },
-        weekTxns.filter(t => t.cat === 'Entertainment').length > 3 ? { icon: '🎬', msg: 'Multiple entertainment transactions this week. Check if any subscriptions can be paused.', color: '#8b5cf6' } : null
+        monthTxns.filter(t => t.cat === 'Entertainment').length > 3 ? { icon: '🎬', msg: 'Multiple entertainment transactions this month. Check if any subscriptions can be paused.', color: '#8b5cf6' } : null
     ].filter(Boolean);
 
     const wrSug = document.getElementById('wrSuggestions');

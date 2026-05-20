@@ -98,6 +98,8 @@ python3 -m http.server 5500
 | GET/POST | `/api/user/transactions` | List / add transaction |
 | PATCH/DELETE | `/api/user/transactions/:id` | Edit / delete one |
 | DELETE | `/api/user/transactions` | Bulk delete `{ ids: [...] }` |
+| POST | `/api/user/transactions/archive` | Archive past-month transactions |
+| GET | `/api/user/monthly-transactions` | List all archived monthly transactions |
 | GET/POST | `/api/user/journals` | List / add journal entry |
 | PATCH/DELETE | `/api/user/journals/:id` | Edit / delete one |
 | GET/POST | `/api/user/goals` | List / add savings goal |

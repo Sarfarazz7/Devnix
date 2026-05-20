@@ -110,6 +110,12 @@ const Transactions = {
   async bulkRemove(ids)     { return (await apiFetch('/user/transactions', { method: 'DELETE', body: { ids } })).transactions; },
 };
 
+// ── Monthly Transactions ──────────────────────────────────────────────────────
+const MonthlyTransactions = {
+  async getAll()   { return (await apiFetch('/user/monthly-transactions')).monthlyTransactions; },
+  async archive()  { return apiFetch('/user/transactions/archive', { method: 'POST' }); },
+};
+
 // ── Journals ──────────────────────────────────────────────────────────────────
 const Journals = {
   async getAll()            { return (await apiFetch('/user/journals')).journals; },
@@ -141,4 +147,4 @@ const AI = {
 };
 
 // ── Export ────────────────────────────────────────────────────────────────────
-window.API = { Auth, Settings, Tasks, Transactions, Journals, Goals, Budgets, AI, getToken };
+window.API = { Auth, Settings, Tasks, Transactions, MonthlyTransactions, Journals, Goals, Budgets, AI, getToken };

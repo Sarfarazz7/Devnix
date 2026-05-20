@@ -252,6 +252,7 @@ function normaliseUser(u) {
   norm.transactions = Array.isArray(norm.transactions) ? norm.transactions : [];
   norm.journals = Array.isArray(norm.journals) ? norm.journals : [];
   norm.savingsGoals = Array.isArray(norm.savingsGoals) ? norm.savingsGoals : [];
+  norm.monthlyTransactions = Array.isArray(norm.monthlyTransactions) ? norm.monthlyTransactions : [];
   norm.tasks = Array.isArray(norm.tasks) ? norm.tasks : [];
   return norm;
 }
@@ -303,16 +304,17 @@ document.querySelectorAll('.fin-tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.fin-tab').forEach(x => x.classList.remove('on'));
     t.classList.add('on');
-    ['ftOverview', 'ftAnalytics', 'ftTransactions', 'ftReview'].forEach(id => {
+    ['ftOverview', 'ftAnalytics', 'ftTransactions', 'ftMonthHistory', 'ftReview'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.add('H');
     });
-    const map = { overview: 'ftOverview', analytics: 'ftAnalytics', transactions: 'ftTransactions', review: 'ftReview' };
+    const map = { overview: 'ftOverview', analytics: 'ftAnalytics', transactions: 'ftTransactions', monthHistory: 'ftMonthHistory', review: 'ftReview' };
     const target = document.getElementById(map[t.dataset.ft]);
     if (target) target.classList.remove('H');
     if (t.dataset.ft === 'overview') renderFinOverview();
     else if (t.dataset.ft === 'analytics') renderFinAnalytics();
     else if (t.dataset.ft === 'transactions') renderTxPage();
+    else if (t.dataset.ft === 'monthHistory') renderMonthHistory();
     else if (t.dataset.ft === 'review') renderWeeklyReview();
   });
 });
@@ -1300,11 +1302,12 @@ function renderFinOverview() {
   const incTxCount = txns.filter(t => t.type === 'income').length;
   const expTxCount = txns.filter(t => t.type === 'expense').length;
 
+  const currMonthLabel = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
   const kpiDefs = [
-    { label: 'Total income', val: hasData ? fmtCurrency(inc) : '₹0', sub: hasData ? incTxCount + ' income entr' + (incTxCount === 1 ? 'y' : 'ies') : 'Add your first income →', pos: true, color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>' },
-    { label: 'Total expenses', val: hasData ? fmtCurrency(exp) : '₹0', sub: hasData ? expTxCount + ' expense entr' + (expTxCount === 1 ? 'y' : 'ies') : 'No expenses recorded yet', pos: false, color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3 3 3-3h-2v-4z"/>' },
-    { label: 'Net savings', val: hasData ? fmtCurrency(net) : '₹0', sub: hasData ? (net >= 0 ? savRate + '% savings rate' : 'Expenses exceed income') : 'Updates on first entry', pos: net >= 0, color: net >= 0 ? '#22c55e' : '#ef4444', bg: net >= 0 ? (isDk() ? '#0d2818' : '#f0fdf4') : (isDk() ? '#2d0f0f' : '#fef2f2'), icon: '<path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>' },
-    { label: 'Net worth', val: hasData ? fmtCurrency(net) : '₹0', sub: hasData ? (net >= 0 ? 'Income minus all expenses' : 'Review your spending') : 'Reflects your total net', pos: net >= 0, color: net >= 0 ? '#8b5cf6' : '#ef4444', bg: isDk() ? '#1e0d3d' : '#f5f3ff', icon: '<path d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z"/>' }
+    { label: 'Monthly income', val: hasData ? fmtCurrency(inc) : '₹0', sub: hasData ? incTxCount + ' income entr' + (incTxCount === 1 ? 'y' : 'ies') + ' · ' + currMonthLabel : 'Add your first income →', pos: true, color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>' },
+    { label: 'Monthly expenses', val: hasData ? fmtCurrency(exp) : '₹0', sub: hasData ? expTxCount + ' expense entr' + (expTxCount === 1 ? 'y' : 'ies') + ' · ' + currMonthLabel : 'No expenses recorded yet', pos: false, color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3 3 3-3h-2v-4z"/>' },
+    { label: 'Net savings', val: hasData ? fmtCurrency(net) : '₹0', sub: hasData ? (net >= 0 ? savRate + '% savings rate' : 'Expenses exceed income') + ' · ' + currMonthLabel : 'Updates on first entry', pos: net >= 0, color: net >= 0 ? '#22c55e' : '#ef4444', bg: net >= 0 ? (isDk() ? '#0d2818' : '#f0fdf4') : (isDk() ? '#2d0f0f' : '#fef2f2'), icon: '<path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>' },
+    { label: 'Net worth', val: hasData ? fmtCurrency(net) : '₹0', sub: hasData ? (net >= 0 ? 'Income minus all expenses' : 'Review your spending') + ' · ' + currMonthLabel : 'Reflects your total net', pos: net >= 0, color: net >= 0 ? '#8b5cf6' : '#ef4444', bg: isDk() ? '#1e0d3d' : '#f5f3ff', icon: '<path d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z"/>' }
   ];
 
   const kpiRow = document.getElementById('kpiRow');
@@ -1745,6 +1748,9 @@ function renderTxPage() {
   const dateEl = document.getElementById('qaDate');
   if (dateEl) dateEl.value = today();
 
+  const monthLabel = document.getElementById('txMonthLabel');
+  if (monthLabel) monthLabel.textContent = new Date().toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+
   // Wire up add button
   const qaAdd = document.getElementById('qaAdd');
   if (qaAdd) qaAdd.onclick = addTransaction;
@@ -2060,6 +2066,143 @@ function renderWeeklyReview() {
     const color = CAT_COLORS_AN[cat] || '#888';
     return `<div class="cat-item2"><div class="cat-head2"><div class="cat-name2"><div class="cat-dot" style="background:${color}"></div>${cat}</div><div style="display:flex;gap:8px;align-items:center"><span style="font-size:11px;color:${over ? '#ef4444' : 'var(--tx3)'}">₹${spent.toFixed(0)} / ₹${budget}</span><span class="cat-amt" style="color:${over ? '#ef4444' : color}">${pct}%</span></div></div><div class="cat-track"><div class="cat-fill" style="width:${Math.min(pct, 100)}%;background:${over ? '#ef4444' : color}"></div></div></div>`;
   }).join('') || '<div style="font-size:12px;color:var(--tx3);padding:8px 0">Set budgets in the Analytics tab to track actuals here.</div>';
+}
+
+// ══════════════════════════════════════════════════════════
+//  MONTHLY TRANSACTION ARCHIVE
+// ══════════════════════════════════════════════════════════
+
+async function archiveOldTransactions() {
+  const u = usr(); if (!u) return;
+  const currentMonth = new Date().toISOString().slice(0, 7);
+  const hasPast = (u.transactions || []).some(t => t.date && t.date.slice(0, 7) !== currentMonth);
+  if (!hasPast) return;
+  try {
+    const result = await API.MonthlyTransactions.archive();
+    if (result.archived > 0) {
+      S.user.transactions = result.transactions;
+      S.user.monthlyTransactions = result.monthlyTransactions;
+      toast(result.archived + ' past transaction' + (result.archived > 1 ? 's' : '') + ' archived to month history.');
+    }
+  } catch (e) { console.warn('Archive failed:', e.message); }
+}
+
+function renderMonthHistory() {
+  const u = usr(); if (!u) return;
+  const archives = (u.monthlyTransactions || []).sort((a, b) => b.month.localeCompare(a.month));
+
+  const select = document.getElementById('mhMonthSelect');
+  const emptyEl = document.getElementById('mhEmpty');
+  const summaryEl = document.getElementById('mhSummaryCards');
+  const bodyEl = document.getElementById('mhBody');
+  const headEl = document.getElementById('mhHead');
+  const countEl = document.getElementById('mhTxCount');
+
+  if (!select || !bodyEl) return;
+
+  if (archives.length === 0) {
+    if (emptyEl) emptyEl.style.display = 'block';
+    if (summaryEl) summaryEl.innerHTML = '';
+    if (bodyEl) bodyEl.innerHTML = '';
+    if (headEl) headEl.innerHTML = '';
+    if (countEl) countEl.textContent = '';
+    select.innerHTML = '<option value="">— No archived months —</option>';
+    return;
+  }
+
+  if (emptyEl) emptyEl.style.display = 'none';
+
+  const prev = select.value;
+  select.innerHTML = '';
+  archives.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.month;
+    opt.textContent = formatMonthYear(a.month);
+    select.appendChild(opt);
+  });
+  if (prev && archives.some(a => a.month === prev)) select.value = prev;
+  else select.value = archives[0].month;
+
+  select.onchange = () => renderMHContent();
+
+  const searchEl = document.getElementById('mhSearch');
+  if (searchEl) searchEl.oninput = () => renderMHContent();
+  const catFEl = document.getElementById('mhCatF');
+  if (catFEl) catFEl.onchange = () => renderMHContent();
+
+  const exportBtn = document.getElementById('mhExportBtn');
+  if (exportBtn) exportBtn.onclick = () => {
+    const arch = archives.find(a => a.month === select.value);
+    if (arch) {
+      exportTxCSV(arch.transactions, 'transactions_' + arch.month + '.csv');
+      toast('Exported ' + arch.transactions.length + ' transactions!');
+    }
+  };
+
+  renderMHContent();
+}
+
+function renderMHContent() {
+  const u = usr(); if (!u) return;
+  const archives = u.monthlyTransactions || [];
+  const select = document.getElementById('mhMonthSelect');
+  const month = select ? select.value : '';
+  const archive = archives.find(a => a.month === month);
+
+  const summaryEl = document.getElementById('mhSummaryCards');
+  const bodyEl = document.getElementById('mhBody');
+  const headEl = document.getElementById('mhHead');
+  const countEl = document.getElementById('mhTxCount');
+
+  if (!archive) {
+    if (summaryEl) summaryEl.innerHTML = '';
+    if (bodyEl) bodyEl.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--tx3);padding:28px 0">Select a month to view archived transactions</td></tr>';
+    if (headEl) headEl.innerHTML = '';
+    if (countEl) countEl.textContent = '';
+    return;
+  }
+
+  const s = archive.summary || {};
+  if (summaryEl) {
+    summaryEl.innerHTML = [
+      { label: 'Income', val: fmtCurrency(s.totalIncome || 0), color: '#22c55e', bg: 'var(--grnbg, #f0fdf4)' },
+      { label: 'Expenses', val: fmtCurrency(s.totalExpense || 0), color: '#ef4444', bg: 'var(--redbg, #fef2f2)' },
+      { label: 'Net', val: fmtCurrency(s.net || 0), color: (s.net || 0) >= 0 ? '#22c55e' : '#ef4444', bg: (s.net || 0) >= 0 ? 'var(--grnbg, #f0fdf4)' : 'var(--redbg, #fef2f2)' },
+      { label: 'Transactions', val: String(s.count || 0), color: '#3b82f6', bg: 'var(--blubg, #eff6ff)' }
+    ].map(k => `<div class="kpi" style="border-left:3px solid ${k.color};background:${k.bg}"><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.color}">${k.val}</div></div>`).join('');
+  }
+
+  let rows = archive.transactions || [];
+  const search = (document.getElementById('mhSearch')?.value || '').toLowerCase();
+  const cat = document.getElementById('mhCatF')?.value || 'all';
+
+  rows = rows.filter(t =>
+    (cat === 'all' || t.cat === cat) &&
+    ((t.name || '').toLowerCase().includes(search) || (t.cat || '').toLowerCase().includes(search))
+  );
+
+  rows = [...rows].sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  if (countEl) countEl.textContent = rows.length + ' of ' + (archive.transactions || []).length;
+
+  if (headEl) headEl.innerHTML = '<tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr>';
+
+  if (!rows.length) {
+    bodyEl.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--tx3);padding:28px 0">No transactions match your filters</td></tr>';
+    return;
+  }
+
+  bodyEl.innerHTML = '';
+  rows.forEach(t => {
+    const col = CAT_COLORS[t.cat] || '#888';
+    const bg = isDk() ? col + '22' : col + '18';
+    const pos = t.amt > 0;
+    const sb = t.status === 'cleared' ? (isDk() ? '#0d2818' : '#f0fdf4') : (isDk() ? '#2e1e00' : '#fffbeb');
+    const sc = t.status === 'cleared' ? (isDk() ? '#3fb950' : '#15803d') : (isDk() ? '#d29922' : '#b45309');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td style="color:var(--tx3);font-size:11px">${t.date || ''}</td><td><div class="tx-row"><div class="tx-icon" style="background:${bg};color:${col}"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:${col}">${CAT_ICONS[t.cat] || ''}</svg></div><div class="tx-name">${escHtml(t.name || '')}</div></div></td><td><span class="badge" style="background:${bg};color:${col}">${t.cat || ''}</span></td><td class="${pos ? 'amt-pos' : 'amt-neg'}" style="font-variant-numeric:tabular-nums">${pos ? '+' : '-'}₹${Math.abs(t.amt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td><span class="badge" style="background:${sb};color:${sc}">${t.status || 'cleared'}</span></td>`;
+    bodyEl.appendChild(tr);
+  });
 }
 
 // ══════════════════════════════════════════════════════════
@@ -3199,6 +3342,9 @@ function mountApp() {
   setTimeout(() => renderDisciplineAnalytics(), 800);
   setTimeout(() => renderCommandCenter(), 1200);
   setSyncState('saved');
+
+  // Auto-archive past-month transactions on app load
+  setTimeout(() => archiveOldTransactions(), 500);
 }
 
 // ── Modal buttons wired once at startup ───────────────────

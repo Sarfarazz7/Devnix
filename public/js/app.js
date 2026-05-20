@@ -2169,7 +2169,7 @@ function renderMHContent() {
       { label: 'Expenses', val: fmtCurrency(s.totalExpense || 0), color: '#ef4444', bg: 'var(--redbg, #fef2f2)' },
       { label: 'Net', val: fmtCurrency(s.net || 0), color: (s.net || 0) >= 0 ? '#22c55e' : '#ef4444', bg: (s.net || 0) >= 0 ? 'var(--grnbg, #f0fdf4)' : 'var(--redbg, #fef2f2)' },
       { label: 'Transactions', val: String(s.count || 0), color: '#3b82f6', bg: 'var(--blubg, #eff6ff)' }
-    ].map(k => `<div class="kpi" style="border-left:3px solid ${k.color};background:${k.bg}"><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.color}">${k.val}</div></div>`).join('');
+    ].map(k => `<div class="kpi" style="border-left:3px solid ${k.color};background:${k.bg}"><div class="kpi-lbl">${k.label}</div><div class="kpi-val" style="color:${k.color}">${k.val}</div></div>`).join('');
   }
 
   let rows = archive.transactions || [];

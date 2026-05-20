@@ -4602,9 +4602,52 @@ body {
   }
 
   .fin-month-wrap {
-    border-left: none;
-    padding: 0 8px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    padding-right: 12px;
+    border-left: 1px solid var(--bd);
+    padding-left: 12px;
+    margin-left: auto;
+    display: flex;
+    align-items: center;
+    padding-right: 12px;
+    border-left: 1px solid var(--bd);
+    padding-left: 12px;
+    background: var(--sf);
+    height: 100%;
+  }
+
+  #finMonthPick {
     background: var(--sf2);
+    border: 1.5px solid var(--bd);
+    border-radius: 8px;
+    color: var(--tx);
+    font-family: inherit;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 10px;
+    cursor: pointer;
+    transition: all 0.2s var(--ease);
+    outline: none;
+    width: 140px;
+    text-transform: uppercase;
+  }
+
+  #finMonthPick:hover {
+    border-color: var(--blumid);
+    background: var(--sf);
+    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
+  }
+
+  #finMonthPick::-webkit-calendar-picker-indicator {
+    cursor: pointer;
+    filter: var(--dk-filter, none);
+    opacity: 0.6;
+  }
+
+  .dk {
+    --dk-filter: invert(1);
   }
 
   /* Transaction table: hide less important cols */

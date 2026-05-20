@@ -66,6 +66,7 @@
   --grnmid: #3fb950;
   --purmid: #bc8cff;
   --telmid: #2dd4bf;
+  --dk-filter: invert(1) brightness(1.5);
 }
 
 html,
@@ -1931,6 +1932,57 @@ td:hover .tip {
 .fin-tab:hover:not(.on) {
   color: var(--tx);
   background: var(--sf2)
+}
+
+.fin-month-wrap {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  padding: 0 16px;
+  border-left: 1px solid var(--bd);
+  background: var(--sf);
+  height: 100%;
+  gap: 4px;
+}
+
+.fin-month-label {
+  font-size: 10px;
+  color: var(--tx3);
+  margin-right: 8px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  text-transform: uppercase;
+}
+
+#finMonthPick {
+  background: var(--sf2);
+  border: 1.5px solid var(--bd);
+  border-radius: 10px;
+  color: var(--tx);
+  font-family: inherit;
+  font-weight: 700;
+  font-size: 11px;
+  padding: 5px 12px;
+  cursor: pointer;
+  transition: all 0.2s var(--ease);
+  outline: none;
+  width: 155px;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+}
+
+#finMonthPick:hover {
+  border-color: var(--blumid);
+  background: var(--sf);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.12);
+  transform: translateY(-1px);
+}
+
+#finMonthPick::-webkit-calendar-picker-indicator {
+  cursor: pointer;
+  filter: var(--dk-filter, none);
+  opacity: 0.6;
 }
 
 .quick-add {
@@ -4599,55 +4651,6 @@ body {
     white-space: nowrap;
     padding: 9px 12px;
     font-size: 11px;
-  }
-
-  .fin-month-wrap {
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    padding-right: 12px;
-    border-left: 1px solid var(--bd);
-    padding-left: 12px;
-    margin-left: auto;
-    display: flex;
-    align-items: center;
-    padding-right: 12px;
-    border-left: 1px solid var(--bd);
-    padding-left: 12px;
-    background: var(--sf);
-    height: 100%;
-  }
-
-  #finMonthPick {
-    background: var(--sf2);
-    border: 1.5px solid var(--bd);
-    border-radius: 8px;
-    color: var(--tx);
-    font-family: inherit;
-    font-weight: 700;
-    font-size: 11px;
-    padding: 4px 10px;
-    cursor: pointer;
-    transition: all 0.2s var(--ease);
-    outline: none;
-    width: 140px;
-    text-transform: uppercase;
-  }
-
-  #finMonthPick:hover {
-    border-color: var(--blumid);
-    background: var(--sf);
-    box-shadow: 0 2px 8px rgba(59, 130, 246, 0.12);
-  }
-
-  #finMonthPick::-webkit-calendar-picker-indicator {
-    cursor: pointer;
-    filter: var(--dk-filter, none);
-    opacity: 0.6;
-  }
-
-  .dk {
-    --dk-filter: invert(1);
   }
 
   /* Transaction table: hide less important cols */

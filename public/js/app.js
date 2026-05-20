@@ -255,10 +255,10 @@ function ensureFinMonthSelector() {
     const bar = document.querySelector('.fin-subtabs');
     if (bar && !document.getElementById('finMonthPick')) {
         const wrap = document.createElement('div');
-        wrap.style.cssText = 'margin-left:auto; display:flex; align-items:center; padding-right:10px;';
-        wrap.innerHTML = `
-            <span style="font-size:10px; color:var(--tx3); margin-right:8px; font-weight:700; letter-spacing:0.5px;">VIEWING:</span>
-            <input type="month" id="finMonthPick" class="f-sel2" value="${S.finMonth}" style="width:130px; cursor:pointer;"/>
+        wrap.className = 'fin-month-wrap';
+        wrap.innerHTML = ` 
+            <span style="font-size:10px; color:var(--tx3); margin-right:8px; font-weight:700; letter-spacing:0.5px;">VIEWING:</span> 
+            <input type="month" id="finMonthPick" class="f-sel2" value="${S.finMonth}"/> 
         `;
         bar.appendChild(wrap);
         document.getElementById('finMonthPick').onchange = (e) => {

@@ -4601,6 +4601,12 @@ body {
     font-size: 11px;
   }
 
+  .fin-month-wrap {
+    border-left: none;
+    padding: 0 8px;
+    background: var(--sf2);
+  }
+
   /* Transaction table: hide less important cols */
   .tbl-wrap table {
     font-size: 11px;

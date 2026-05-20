@@ -135,7 +135,8 @@ const Budgets = {
 
 // ── Export ────────────────────────────────────────────────────────────────────
 const AI = {
-  async getInsights() { return (await apiFetch('/ai/mentor', { method: 'POST' })).insights; }
+  async getInsights() { return (await apiFetch('/ai/mentor', { method: 'POST' })).insights; },
+  async getCoach(prompt) { return (await apiFetch('/ai/coach', { method: 'POST', body: { prompt } })); }
 };
 
 window.API = { Auth, Settings, Tasks, Transactions, Journals, Goals, Budgets, AI, getToken };

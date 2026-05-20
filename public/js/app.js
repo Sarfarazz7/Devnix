@@ -19,7 +19,6 @@
 
 
 // ── Global state ──────────────────────────────────────────
-const GEMINI_KEY_COACH = '';
 let S = { user: null, dark: false, finMonth: new Date().toISOString().slice(0, 7) };
 let wOff = 0, barCI = null, lineCI = null, analyDays = 14;
 let dragActive = false, dragVal = false;
@@ -2718,7 +2717,6 @@ function renderJournalAnalyticsPanel(journals) {
 }
 
 function renderJournalEditorForm(wrap) {
-    const GEMINI_KEY = 'AIzaSyCDU8lLV9-DXCxGFpIe_Gk8cAdogHD4kJw';
     const isEdit = jState.mode === 'edit' && !!jState.editId;
     const journals = getJournals();
     const existing = isEdit ? journals.find(j => j.id === jState.editId) : null;
@@ -3407,20 +3405,11 @@ async function fetchAICoach(snap) {
     const textEl = document.getElementById('aiCoachText');
     if (!textEl) return;
     try {
-        const res = await fetch(
-            `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_KEY_COACH}`,
-            {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    contents: [{ parts: [{ text: buildCoachPrompt(snap) }] }],
-                    generationConfig: { maxOutputTokens: 150, temperature: 0.8 }
-                })
-            }
-        );
-        const data = await res.json();
-        const msg = data?.candidates?.[0]?.content?.parts?.[0]?.text?.trim() || '';
-        if (msg) {
+        const prompt = buildCoachPrompt(snap);
+        const data = await API.AI.getCoach(prompt);
+        
+        if (data && data.message) {
+            const msg = data.message;
             textEl.style.opacity = '0';
             textEl.style.transition = 'opacity .4s';
             setTimeout(() => { textEl.textContent = msg; textEl.style.opacity = '1'; }, 400);

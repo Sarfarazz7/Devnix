@@ -257,8 +257,8 @@ function ensureFinMonthSelector() {
         const wrap = document.createElement('div');
         wrap.className = 'fin-month-wrap';
         wrap.innerHTML = ` 
-            <span style="font-size:10px; color:var(--tx3); margin-right:8px; font-weight:700; letter-spacing:0.5px;">VIEWING:</span> 
-            <input type="month" id="finMonthPick" class="f-sel2" value="${S.finMonth}"/> 
+            <span class="fin-month-label">VIEWING:</span> 
+            <input type="month" id="finMonthPick" value="${S.finMonth}"/> 
         `;
         bar.appendChild(wrap);
         document.getElementById('finMonthPick').onchange = (e) => {

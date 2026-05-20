@@ -161,7 +161,7 @@ async function doAuth() {
 
 async function doLogout() {
     try { API.Auth.logout(); } catch (e) { /* ignore */ }
-    S = { user: null, dark: false };
+    S = { user: null, dark: false, finMonth: new Date().toISOString().slice(0, 7) };
     wOff = 0;
     selectedTxIds.clear();
     // Destroy charts to avoid canvas reuse errors
@@ -261,11 +261,18 @@ function ensureFinMonthSelector() {
             <input type="month" id="finMonthPick" value="${S.finMonth}"/> 
         `;
         bar.appendChild(wrap);
-        document.getElementById('finMonthPick').onchange = (e) => {
+        const picker = document.getElementById('finMonthPick');
+        const updateGlow = () => {
+            const isNow = S.finMonth === new Date().toISOString().slice(0, 7);
+            picker.classList.toggle('is-current', isNow);
+        };
+        picker.onchange = (e) => {
             S.finMonth = e.target.value;
+            updateGlow();
             const active = document.querySelector('.fin-tab.on');
             if (active) active.click();
         };
+        updateGlow();
     }
 }
 

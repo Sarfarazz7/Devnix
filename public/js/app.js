@@ -259,6 +259,12 @@ function ensureFinMonthSelector() {
         wrap.innerHTML = ` 
             <span class="fin-month-label">VIEWING:</span> 
             <input type="month" id="finMonthPick" value="${S.finMonth}"/> 
+            <span class="fin-month-label">
+                <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5c-1.11 0-1.99.9-1.99 2L3 20c0 1.1.89 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V9h14v11z"/></svg>
+                VIEWING:
+            </span> 
+            <input type="month" id="finMonthPick" value="${S.finMonth}"/>
+            <button class="fin-today-btn" id="finJumpToday">Today</button>
         `;
         bar.appendChild(wrap);
         const picker = document.getElementById('finMonthPick');
@@ -271,6 +277,13 @@ function ensureFinMonthSelector() {
             updateGlow();
             const active = document.querySelector('.fin-tab.on');
             if (active) active.click();
+        };
+        const jumpBtn = document.getElementById('finJumpToday');
+        if (jumpBtn) jumpBtn.onclick = () => {
+            const now = new Date().toISOString().slice(0, 7);
+            if (S.finMonth === now) return;
+            picker.value = now;
+            picker.dispatchEvent(new Event('change'));
         };
         updateGlow();
     }

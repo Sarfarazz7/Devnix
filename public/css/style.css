@@ -1942,8 +1942,9 @@ td:hover .tip {
   border-left: 1px solid var(--bd);
   background: var(--sf);
   height: 100%;
-  gap: 4px;
+  gap: 8px;
 }
+@media (max-width: 767px) { .fin-month-wrap { border-left: none; padding: 0 8px; gap: 4px; } }
 
 .fin-month-label {
   font-size: 10px;
@@ -1952,6 +1953,16 @@ td:hover .tip {
   font-weight: 700;
   letter-spacing: 0.5px;
   text-transform: uppercase;
+  display: flex;
+  align-items: center;
+}
+@media (max-width: 767px) { .fin-month-label { display: none; } }
+
+.fin-month-label svg {
+  width: 12px;
+  height: 12px;
+  fill: currentColor;
+  margin-right: 6px;
 }
 
 #finMonthPick {
@@ -1980,8 +1991,36 @@ td:hover .tip {
 }
 
 #finMonthPick.is-current {
-  border-color: var(--pm);
-  box-shadow: 0 0 12px rgba(76, 175, 80, 0.25);
+  border-color: var(--pm) !important;
+  box-shadow: 0 0 15px rgba(76, 175, 80, 0.4);
+  animation: pulse-glow 2.5s infinite ease-in-out;
+}
+
+@keyframes pulse-glow {
+  0% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.2); }
+  50% { box-shadow: 0 0 20px rgba(76, 175, 80, 0.55); }
+  100% { box-shadow: 0 0 8px rgba(76, 175, 80, 0.2); }
+}
+
+.fin-today-btn {
+  background: var(--sf2);
+  border: 1px solid var(--bd);
+  color: var(--tx3);
+  border-radius: 6px;
+  font-size: 9px;
+  font-weight: 800;
+  padding: 5px 10px;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: all 0.2s;
+  letter-spacing: 0.5px;
+}
+
+.fin-today-btn:hover {
+  background: var(--sf);
+  color: var(--tx);
+  border-color: var(--bd2);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
 }
 
 #finMonthPick::-webkit-calendar-picker-indicator {

@@ -237,6 +237,10 @@
         <svg viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-7 3c1.93 0 3.5 1.57 3.5 3.5S13.93 13 12 13s-3.5-1.57-3.5-3.5S10.07 6 12 6zm7 13H5v-.23c0-.62.28-1.2.76-1.58C7.47 15.82 9.64 15 12 15s4.53.82 6.24 2.19c.48.38.76.97.76 1.58V19z"/></svg>
         Transactions
       </div>
+      <div class="fin-tab" data-ft="monthly">
+        <svg viewBox="0 0 24 24"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11zM9 10H7v2h2v-2zm4 0h-2v2h2v-2zm4 0h-2v2h2v-2z"/></svg>
+        Month Transactions
+      </div>
       <div class="fin-tab" data-ft="review">
         <svg viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
         Weekly Review
@@ -252,7 +256,7 @@
       <div class="chart-row2">
         <div class="fin-card">
           <div class="card-head2">
-            <div><div class="card-title2">Income vs Expenses</div><div class="card-sub2">Monthly comparison</div></div>
+            <div><div class="card-title2">Income vs Expenses</div><div class="card-sub2">Current month</div></div>
             <div class="legend2">
               <span class="leg-item"><span class="leg-sq" style="background:#3b82f6"></span>Income</span>
               <span class="leg-item"><span class="leg-sq" style="border:2px dashed #ef4444;background:transparent"></span>Expenses</span>
@@ -396,7 +400,7 @@
       <div class="fin-card">
         <div class="tbl-head2">
           <div style="display:flex;align-items:center;gap:10px">
-            <div class="card-title2">Transaction history</div>
+            <div class="card-title2">Current month transactions</div>
             <span id="txRowCount" style="font-size:11px;color:var(--tx3);background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:2px 8px"></span>
           </div>
           <div class="tbl-filters">
@@ -420,6 +424,40 @@
           </div>
         </div>
         <div class="tbl-wrap"><table><thead id="txHead2"></thead><tbody id="txBody2"></tbody></table></div>
+      </div>
+    </div>
+    <div id="ftMonthly" class="page H">
+      <div class="fin-card" style="margin-bottom:16px">
+        <div class="tbl-head2">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-title2">Monthly Archives</div>
+            <span id="monthlyArchiveCount" style="font-size:11px;color:var(--tx3);background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:2px 8px"></span>
+          </div>
+          <div class="tbl-filters">
+            <select class="f-sel2" id="archiveMonthSelect" style="min-width:180px">
+              <option value="">Select a month...</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div id="monthlyKpiRow" class="kpi-row" style="margin-bottom:16px"></div>
+      <div class="fin-card" id="monthlyTxCard" style="display:none">
+        <div class="tbl-head2">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div class="card-title2" id="monthlyTxTitle">Transactions</div>
+            <span id="monthlyTxCount" style="font-size:11px;color:var(--tx3);background:var(--sf2);border:1px solid var(--bd);border-radius:10px;padding:2px 8px"></span>
+          </div>
+          <div class="tbl-filters">
+            <input class="f-inp2" id="monthlyTxSearch" placeholder="Search..."/>
+            <button class="sel-btn" id="monthlyExportBtn" style="height:32px;padding:0 12px;background:var(--sf2);color:var(--tx2);border:1px solid var(--bd);border-radius:8px;font-size:11px;font-weight:600;cursor:pointer;font-family:inherit">&#8681; Export CSV</button>
+          </div>
+        </div>
+        <div class="tbl-wrap"><table><thead id="monthlyTxHead"></thead><tbody id="monthlyTxBody"></tbody></table></div>
+      </div>
+      <div id="monthlyEmptyState" class="fin-card" style="text-align:center;padding:40px 20px;color:var(--tx3)">
+        <div style="font-size:32px;margin-bottom:12px">&#128197;</div>
+        <div style="font-size:14px;font-weight:600;margin-bottom:6px">No monthly archives yet</div>
+        <div style="font-size:12px">At the start of each new month, your previous month's transactions will be automatically archived here.</div>
       </div>
     </div>
     <div id="ftReview" class="page H">

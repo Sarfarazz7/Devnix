@@ -250,6 +250,7 @@ function normaliseUser(u) {
   norm.notes = toPlainObj(norm.notes);
   norm.budgets = toPlainObj(norm.budgets);
   norm.transactions = Array.isArray(norm.transactions) ? norm.transactions : [];
+  norm.monthlyArchives = Array.isArray(norm.monthlyArchives) ? norm.monthlyArchives : [];
   norm.journals = Array.isArray(norm.journals) ? norm.journals : [];
   norm.savingsGoals = Array.isArray(norm.savingsGoals) ? norm.savingsGoals : [];
   norm.tasks = Array.isArray(norm.tasks) ? norm.tasks : [];
@@ -303,16 +304,17 @@ document.querySelectorAll('.fin-tab').forEach(t => {
   t.addEventListener('click', () => {
     document.querySelectorAll('.fin-tab').forEach(x => x.classList.remove('on'));
     t.classList.add('on');
-    ['ftOverview', 'ftAnalytics', 'ftTransactions', 'ftReview'].forEach(id => {
+    ['ftOverview', 'ftAnalytics', 'ftTransactions', 'ftMonthly', 'ftReview'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.classList.add('H');
     });
-    const map = { overview: 'ftOverview', analytics: 'ftAnalytics', transactions: 'ftTransactions', review: 'ftReview' };
+    const map = { overview: 'ftOverview', analytics: 'ftAnalytics', transactions: 'ftTransactions', monthly: 'ftMonthly', review: 'ftReview' };
     const target = document.getElementById(map[t.dataset.ft]);
     if (target) target.classList.remove('H');
     if (t.dataset.ft === 'overview') renderFinOverview();
     else if (t.dataset.ft === 'analytics') renderFinAnalytics();
     else if (t.dataset.ft === 'transactions') renderTxPage();
+    else if (t.dataset.ft === 'monthly') renderMonthlyTxPage();
     else if (t.dataset.ft === 'review') renderWeeklyReview();
   });
 });
@@ -1301,8 +1303,8 @@ function renderFinOverview() {
   const expTxCount = txns.filter(t => t.type === 'expense').length;
 
   const kpiDefs = [
-    { label: 'Total income', val: hasData ? fmtCurrency(inc) : '₹0', sub: hasData ? incTxCount + ' income entr' + (incTxCount === 1 ? 'y' : 'ies') : 'Add your first income →', pos: true, color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>' },
-    { label: 'Total expenses', val: hasData ? fmtCurrency(exp) : '₹0', sub: hasData ? expTxCount + ' expense entr' + (expTxCount === 1 ? 'y' : 'ies') : 'No expenses recorded yet', pos: false, color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3 3 3-3h-2v-4z"/>' },
+    { label: 'This month income', val: hasData ? fmtCurrency(inc) : '₹0', sub: hasData ? incTxCount + ' income entr' + (incTxCount === 1 ? 'y' : 'ies') : 'Add your first income →', pos: true, color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3-3 3 3h-2v4z"/>' },
+    { label: 'This month expenses', val: hasData ? fmtCurrency(exp) : '₹0', sub: hasData ? expTxCount + ' expense entr' + (expTxCount === 1 ? 'y' : 'ies') : 'No expenses recorded yet', pos: false, color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2', icon: '<path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-4H9l3 3 3-3h-2v-4z"/>' },
     { label: 'Net savings', val: hasData ? fmtCurrency(net) : '₹0', sub: hasData ? (net >= 0 ? savRate + '% savings rate' : 'Expenses exceed income') : 'Updates on first entry', pos: net >= 0, color: net >= 0 ? '#22c55e' : '#ef4444', bg: net >= 0 ? (isDk() ? '#0d2818' : '#f0fdf4') : (isDk() ? '#2d0f0f' : '#fef2f2'), icon: '<path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/>' },
     { label: 'Net worth', val: hasData ? fmtCurrency(net) : '₹0', sub: hasData ? (net >= 0 ? 'Income minus all expenses' : 'Review your spending') : 'Reflects your total net', pos: net >= 0, color: net >= 0 ? '#8b5cf6' : '#ef4444', bg: isDk() ? '#1e0d3d' : '#f5f3ff', icon: '<path d="M23 8c0 1.1-.9 2-2 2-.18 0-.35-.02-.51-.07l-3.56 3.55c.05.16.07.34.07.52 0 1.1-.9 2-2 2s-2-.9-2-2c0-.18.02-.36.07-.52l-2.55-2.55c-.16.05-.34.07-.52.07s-.36-.02-.52-.07l-4.55 4.56c.05.16.07.33.07.51 0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2c.18 0 .35.02.51.07l4.56-4.55C8.02 9.36 8 9.18 8 9c0-1.1.9-2 2-2s2 .9 2 2c0 .18-.02.36-.07.52l2.55 2.55c.16-.05.34-.07.52-.07s.36.02.52.07l3.55-3.56C19.02 8.35 19 8.18 19 8c0-1.1.9-2 2-2s2 .9 2 2z"/>' }
   ];
@@ -1997,6 +1999,145 @@ function renderTxTable() {
     const foot = document.createElement('tr');
     foot.innerHTML = `<td colspan="6" style="padding:8px 14px;background:var(--blubg);border-top:1px solid var(--blumid);font-size:11px;color:var(--blumid);font-weight:600">Selected: ${selRows.length} row${selRows.length > 1 ? 's' : ''}${selInc > 0 ? ` &nbsp;·&nbsp; <span style="color:var(--grnmid)">+₹${selInc.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>` : ''}${selExp > 0 ? ` &nbsp;·&nbsp; <span style="color:var(--redm)">-₹${selExp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span>` : ''} &nbsp;·&nbsp; Net: <span style="color:${selInc - selExp >= 0 ? 'var(--grnmid)' : 'var(--redm)'}">${selInc - selExp >= 0 ? '+' : ''}₹${Math.abs(selInc - selExp).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></td>`;
     body.appendChild(foot);
+  }
+}
+
+// ── Monthly Transactions (archived) ────────────────────────
+let monthlyArchiveData = [];
+let selectedArchiveMonth = '';
+
+async function renderMonthlyTxPage() {
+  try {
+    monthlyArchiveData = await API.MonthlyTransactions.getAll();
+  } catch (e) {
+    monthlyArchiveData = [];
+  }
+
+  const countEl = document.getElementById('monthlyArchiveCount');
+  const select = document.getElementById('archiveMonthSelect');
+  const emptyEl = document.getElementById('monthlyEmptyState');
+  const cardEl = document.getElementById('monthlyTxCard');
+  const kpiRow = document.getElementById('monthlyKpiRow');
+
+  if (!select || !emptyEl || !cardEl) return;
+
+  if (countEl) countEl.textContent = monthlyArchiveData.length + ' month' + (monthlyArchiveData.length !== 1 ? 's' : '');
+
+  select.innerHTML = '<option value="">Select a month...</option>';
+  monthlyArchiveData.forEach(a => {
+    const opt = document.createElement('option');
+    opt.value = a.month;
+    opt.textContent = formatMonthYear(a.month) + ' (' + a.count + ' transactions)';
+    select.appendChild(opt);
+  });
+
+  if (selectedArchiveMonth && monthlyArchiveData.some(a => a.month === selectedArchiveMonth)) {
+    select.value = selectedArchiveMonth;
+  } else {
+    selectedArchiveMonth = '';
+  }
+
+  select.onchange = () => {
+    selectedArchiveMonth = select.value;
+    if (selectedArchiveMonth) loadMonthlyArchive(selectedArchiveMonth);
+    else {
+      cardEl.style.display = 'none';
+      kpiRow.innerHTML = '';
+    }
+  };
+
+  if (monthlyArchiveData.length === 0) {
+    emptyEl.style.display = '';
+    cardEl.style.display = 'none';
+    kpiRow.innerHTML = '';
+  } else {
+    emptyEl.style.display = 'none';
+    if (selectedArchiveMonth) {
+      loadMonthlyArchive(selectedArchiveMonth);
+    } else if (monthlyArchiveData.length > 0) {
+      selectedArchiveMonth = monthlyArchiveData[0].month;
+      select.value = selectedArchiveMonth;
+      loadMonthlyArchive(selectedArchiveMonth);
+    }
+  }
+}
+
+async function loadMonthlyArchive(month) {
+  const cardEl = document.getElementById('monthlyTxCard');
+  const kpiRow = document.getElementById('monthlyKpiRow');
+  const titleEl = document.getElementById('monthlyTxTitle');
+  const countEl = document.getElementById('monthlyTxCount');
+  const headEl = document.getElementById('monthlyTxHead');
+  const bodyEl = document.getElementById('monthlyTxBody');
+  const searchEl = document.getElementById('monthlyTxSearch');
+  const exportBtn = document.getElementById('monthlyExportBtn');
+
+  if (!cardEl || !headEl || !bodyEl) return;
+
+  try {
+    const data = await API.MonthlyTransactions.getMonth(month);
+    const txns = data.transactions || [];
+    cardEl.style.display = '';
+
+    if (titleEl) titleEl.textContent = formatMonthYear(month) + ' Transactions';
+    if (countEl) countEl.textContent = txns.length;
+
+    const { inc, exp, net } = calcTotals(txns);
+    const savRate = inc > 0 ? Math.round(net / inc * 100) : 0;
+
+    if (kpiRow) {
+      kpiRow.innerHTML = [
+        { label: 'Income', val: fmtCurrency(inc), color: '#3b82f6', bg: isDk() ? '#0d2044' : '#eff6ff' },
+        { label: 'Expenses', val: fmtCurrency(exp), color: '#ef4444', bg: isDk() ? '#2d0f0f' : '#fef2f2' },
+        { label: 'Net', val: fmtCurrency(net), color: net >= 0 ? '#22c55e' : '#ef4444', bg: net >= 0 ? (isDk() ? '#0d2818' : '#f0fdf4') : (isDk() ? '#2d0f0f' : '#fef2f2') },
+        { label: 'Savings Rate', val: savRate + '%', color: '#8b5cf6', bg: isDk() ? '#1e0d3d' : '#f5f3ff' }
+      ].map(k => `<div class="kpi" style="border-left:3px solid ${k.color};background:${k.bg}"><div class="kpi-label">${k.label}</div><div class="kpi-val" style="color:${k.color}">${k.val}</div></div>`).join('');
+    }
+
+    const renderArchiveTable = () => {
+      const search = (searchEl?.value || '').toLowerCase();
+      let rows = txns.filter(t =>
+        (t.name || '').toLowerCase().includes(search) || (t.cat || '').toLowerCase().includes(search)
+      );
+
+      headEl.innerHTML = `<tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th>Status</th></tr>`;
+
+      if (!rows.length) {
+        bodyEl.innerHTML = '<tr><td colspan="5" style="text-align:center;color:var(--tx3);padding:28px 0">No transactions match your search</td></tr>';
+        return;
+      }
+
+      bodyEl.innerHTML = '';
+      rows.forEach(t => {
+        const col = CAT_COLORS[t.cat] || '#888';
+        const bg = isDk() ? col + '22' : col + '18';
+        const pos = t.amt > 0;
+        const sb = t.status === 'cleared' ? (isDk() ? '#0d2818' : '#f0fdf4') : (isDk() ? '#2e1e00' : '#fffbeb');
+        const sc = t.status === 'cleared' ? (isDk() ? '#3fb950' : '#15803d') : (isDk() ? '#d29922' : '#b45309');
+        const tr = document.createElement('tr');
+        tr.innerHTML = `<td style="color:var(--tx3);font-size:11px">${t.date || ''}</td><td><div class="tx-row"><div class="tx-icon" style="background:${bg};color:${col}"><svg viewBox="0 0 24 24" style="width:13px;height:13px;fill:${col}">${CAT_ICONS[t.cat] || ''}</svg></div><div class="tx-name">${escHtml(t.name || '')}</div></div></td><td><span class="badge" style="background:${bg};color:${col}">${t.cat || ''}</span></td><td class="${pos ? 'amt-pos' : 'amt-neg'}" style="font-variant-numeric:tabular-nums">${pos ? '+' : '-'}₹${Math.abs(t.amt).toLocaleString('en-IN', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td><td><span class="badge" style="background:${sb};color:${sc}">${t.status || 'cleared'}</span></td>`;
+        bodyEl.appendChild(tr);
+      });
+
+      const totalRow = document.createElement('tr');
+      const rInc = rows.filter(t => t.amt > 0).reduce((s, t) => s + t.amt, 0);
+      const rExp = rows.filter(t => t.amt < 0).reduce((s, t) => s + Math.abs(t.amt), 0);
+      const rNet = rInc - rExp;
+      totalRow.innerHTML = `<td colspan="5" style="padding:8px 14px;background:var(--blubg);border-top:1px solid var(--blumid);font-size:11px;color:var(--blumid);font-weight:600">Total: ${rows.length} transactions &nbsp;·&nbsp; <span style="color:var(--grnmid)">+₹${rInc.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span> &nbsp;·&nbsp; <span style="color:var(--redm)">-₹${rExp.toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span> &nbsp;·&nbsp; Net: <span style="color:${rNet >= 0 ? 'var(--grnmid)' : 'var(--redm)'}">${rNet >= 0 ? '+' : ''}₹${Math.abs(rNet).toLocaleString('en-IN', { minimumFractionDigits: 2 })}</span></td>`;
+      bodyEl.appendChild(totalRow);
+    };
+
+    if (searchEl) searchEl.oninput = renderArchiveTable;
+    if (exportBtn) exportBtn.onclick = () => {
+      exportTxCSV(txns, 'transactions-' + month + '.csv');
+      toast('Exported ' + txns.length + ' transactions for ' + formatMonthYear(month) + '!');
+    };
+
+    renderArchiveTable();
+  } catch (e) {
+    cardEl.style.display = 'none';
+    if (kpiRow) kpiRow.innerHTML = '';
+    toast('Failed to load archive: ' + e.message, 'warn');
   }
 }
 

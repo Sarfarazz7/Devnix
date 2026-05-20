@@ -23,9 +23,9 @@ const API_BASE = window._DEVNIX_API_BASE;
 console.log('[Devnix] API base →', API_BASE);
 
 // ── Token storage ─────────────────────────────────────────────────────────────
-function getToken()   { try { return localStorage.getItem('devnix_token'); } catch(e) { return null; } }
-function setToken(t)  { try { localStorage.setItem('devnix_token', t); } catch(e) {} }
-function clearToken() { try { localStorage.removeItem('devnix_token'); } catch(e) {} }
+function getToken() { try { return localStorage.getItem('devnix_token'); } catch (e) { return null; } }
+function setToken(t) { try { localStorage.setItem('devnix_token', t); } catch (e) { } }
+function clearToken() { try { localStorage.removeItem('devnix_token'); } catch (e) { } }
 
 // ── Core fetch wrapper ────────────────────────────────────────────────────────
 async function apiFetch(path, { method = 'GET', body } = {}) {
@@ -92,10 +92,10 @@ const Settings = {
 
 // ── Tasks ─────────────────────────────────────────────────────────────────────
 const Tasks = {
-  async getAll()         { return (await apiFetch('/user/tasks')).tasks; },
-  async add(name, cat)   { return (await apiFetch('/user/tasks', { method: 'POST', body: { name, cat } })).tasks; },
+  async getAll() { return (await apiFetch('/user/tasks')).tasks; },
+  async add(name, cat) { return (await apiFetch('/user/tasks', { method: 'POST', body: { name, cat } })).tasks; },
   async rename(id, name) { return (await apiFetch(`/user/tasks/${id}`, { method: 'PATCH', body: { name } })).tasks; },
-  async remove(id)       { return (await apiFetch(`/user/tasks/${id}`, { method: 'DELETE' })).tasks; },
+  async remove(id) { return (await apiFetch(`/user/tasks/${id}`, { method: 'DELETE' })).tasks; },
   async saveCheck(done, skipped, notes) {
     return apiFetch('/user/check', { method: 'PATCH', body: { done, skipped, notes } });
   },
@@ -103,42 +103,39 @@ const Tasks = {
 
 // ── Transactions ──────────────────────────────────────────────────────────────
 const Transactions = {
-  async getAll()            { return (await apiFetch('/user/transactions')).transactions; },
-  async add(tx)             { return (await apiFetch('/user/transactions', { method: 'POST', body: tx })).transactions; },
+  async getAll() { return (await apiFetch('/user/transactions')).transactions; },
+  async add(tx) { return (await apiFetch('/user/transactions', { method: 'POST', body: tx })).transactions; },
   async update(id, changes) { return (await apiFetch(`/user/transactions/${id}`, { method: 'PATCH', body: changes })).transactions; },
-  async remove(id)          { return (await apiFetch(`/user/transactions/${id}`, { method: 'DELETE' })).transactions; },
-  async bulkRemove(ids)     { return (await apiFetch('/user/transactions', { method: 'DELETE', body: { ids } })).transactions; },
+  async remove(id) { return (await apiFetch(`/user/transactions/${id}`, { method: 'DELETE' })).transactions; },
+  async bulkRemove(ids) { return (await apiFetch('/user/transactions', { method: 'DELETE', body: { ids } })).transactions; },
 };
 
 // ── Journals ──────────────────────────────────────────────────────────────────
 const Journals = {
-  async getAll()            { return (await apiFetch('/user/journals')).journals; },
-  async add(entry)          { return (await apiFetch('/user/journals', { method: 'POST', body: entry })).journals; },
+  async getAll() { return (await apiFetch('/user/journals')).journals; },
+  async add(entry) { return (await apiFetch('/user/journals', { method: 'POST', body: entry })).journals; },
   async update(id, changes) { return (await apiFetch(`/user/journals/${id}`, { method: 'PATCH', body: changes })).journals; },
-  async remove(id)          { return (await apiFetch(`/user/journals/${id}`, { method: 'DELETE' })).journals; },
+  async remove(id) { return (await apiFetch(`/user/journals/${id}`, { method: 'DELETE' })).journals; },
 };
 
 // ── Savings Goals ─────────────────────────────────────────────────────────────
 const Goals = {
-  async getAll()            { return (await apiFetch('/user/goals')).savingsGoals; },
-  async add(goal)           { return (await apiFetch('/user/goals', { method: 'POST', body: goal })).savingsGoals; },
+  async getAll() { return (await apiFetch('/user/goals')).savingsGoals; },
+  async add(goal) { return (await apiFetch('/user/goals', { method: 'POST', body: goal })).savingsGoals; },
   async update(id, changes) { return (await apiFetch(`/user/goals/${id}`, { method: 'PATCH', body: changes })).savingsGoals; },
-  async remove(id)          { return (await apiFetch(`/user/goals/${id}`, { method: 'DELETE' })).savingsGoals; },
+  async remove(id) { return (await apiFetch(`/user/goals/${id}`, { method: 'DELETE' })).savingsGoals; },
 };
 
 // ── Budgets ───────────────────────────────────────────────────────────────────
 const Budgets = {
-  async getAll()              { return (await apiFetch('/user/budgets')).budgets; },
+  async getAll() { return (await apiFetch('/user/budgets')).budgets; },
   async set(category, amount) { return (await apiFetch('/user/budgets', { method: 'PATCH', body: { category, amount } })).budgets; },
-  async remove(category)      { return (await apiFetch(`/user/budgets/${category}`, { method: 'DELETE' })).budgets; },
-};
-
-// ── AI Mentor ─────────────────────────────────────────────────────────────────
-const AI = {
-  async getInsights() {
-    return await apiFetch('/ai/mentor', { method: 'POST' });
-  }
+  async remove(category) { return (await apiFetch(`/user/budgets/${category}`, { method: 'DELETE' })).budgets; },
 };
 
 // ── Export ────────────────────────────────────────────────────────────────────
+const AI = {
+  async getInsights() { return (await apiFetch('/ai/mentor', { method: 'POST' })).insights; }
+};
+
 window.API = { Auth, Settings, Tasks, Transactions, Journals, Goals, Budgets, AI, getToken };
